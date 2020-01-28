@@ -24,6 +24,10 @@
 namespace seqan3
 {
 
+template <typename bi_fm_index_t>
+class bi_fm_index_cursor_ng2;
+
+
 /*!\addtogroup submodule_fm_index
  * \{
  */
@@ -187,6 +191,10 @@ public:
 
     template <typename bi_fm_index_t>
     friend class bi_fm_index_cursor;
+
+    template <typename bi_fm_index_t>
+    friend class ::seqan3::bi_fm_index_cursor_ng2;
+
 
     /*!\name Constructors, destructor and assignment
      * \{

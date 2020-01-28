@@ -332,6 +332,10 @@ public:
     template <typename bi_fm_index_t>
     friend class bi_fm_index_cursor;
 
+    template <typename bi_fm_index_t>
+    friend class bi_fm_index_cursor_ng2;
+
+
     template <typename fm_index_t>
     friend class fm_index_cursor;
 

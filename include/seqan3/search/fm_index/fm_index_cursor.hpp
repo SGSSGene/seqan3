@@ -30,6 +30,9 @@
 namespace seqan3
 {
 
+template <typename _index_t>
+class bi_fm_index_cursor_ng2;
+
 /*!\addtogroup submodule_fm_index
  * \{
  */
@@ -100,6 +103,9 @@ private:
 
     template <typename _index_t>
     friend class bi_fm_index_cursor;
+
+    template <typename _index_t>
+    friend class bi_fm_index_cursor_ng2;
 
     //!\brief Helper function to recompute text positions since the indexed text is reversed.
     size_type offset() const noexcept
