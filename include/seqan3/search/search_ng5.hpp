@@ -30,7 +30,8 @@
 #include <seqan3/search/fm_index/bi_fm_index.hpp>
 #include <seqan3/std/ranges>
 
-namespace seqan3 {
+namespace seqan3
+{
 
 /*!\addtogroup submodule_fm_index
  * \{
@@ -58,7 +59,7 @@ namespace seqan3 {
  * running times, you have to additionally look up the running times of the used traits (configuration).
  */
 template <typename index_t>
-class bi_fm_index_cursor_ng2
+class bi_fm_index_cursor_ng5
 {
 public:
     using size_type  = typename index_t::size_type;
@@ -70,6 +71,7 @@ private:
     size_type fwd_lb;
     size_type rev_lb;
     size_type length;
+    size_type depth;
 
 public:
     /*!\name Constructors, destructor and assignment
@@ -78,84 +80,43 @@ public:
     //!\brief Default constructor. Accessing member functions on a default constructed object is undefined behavior.
     //        Default construction is necessary to make this class semi-regular and e.g., to allow construction of
     //        std::array of cursors.
-    bi_fm_index_cursor_ng2() noexcept = default;                                       //!< Defaulted.
-    bi_fm_index_cursor_ng2(bi_fm_index_cursor_ng2 const &) noexcept = default;             //!< Defaulted.
-    bi_fm_index_cursor_ng2 & operator=(bi_fm_index_cursor_ng2 const &) noexcept = default; //!< Defaulted.
-    bi_fm_index_cursor_ng2(bi_fm_index_cursor_ng2 &&) noexcept = default;                  //!< Defaulted.
-    bi_fm_index_cursor_ng2 & operator=(bi_fm_index_cursor_ng2 &&) noexcept = default;      //!< Defaulted.
-    ~bi_fm_index_cursor_ng2() = default;                                               //!< Defaulted.
+    bi_fm_index_cursor_ng5() noexcept = default;                                       //!< Defaulted.
+    bi_fm_index_cursor_ng5(bi_fm_index_cursor_ng5 const &) noexcept = default;             //!< Defaulted.
+    bi_fm_index_cursor_ng5 & operator=(bi_fm_index_cursor_ng5 const &) noexcept = default; //!< Defaulted.
+    bi_fm_index_cursor_ng5(bi_fm_index_cursor_ng5 &&) noexcept = default;                  //!< Defaulted.
+    bi_fm_index_cursor_ng5 & operator=(bi_fm_index_cursor_ng5 &&) noexcept = default;      //!< Defaulted.
+    ~bi_fm_index_cursor_ng5() = default;                                               //!< Defaulted.
 
     //! \brief Construct from given index.
-    bi_fm_index_cursor_ng2(index_t const & _index) noexcept : index(&_index),
-                                                          fwd_lb(0), rev_lb(0), length(index->size())
+    bi_fm_index_cursor_ng5(index_t const & _index) noexcept : index(&_index),
+                                                          fwd_lb(0), rev_lb(0), length(index->size()), depth(0)
     {}
-    bi_fm_index_cursor_ng2(index_t const & _index, size_t _fwd_lb, size_t _rev_lb, size_t _length) noexcept : index(&_index),
-                                                          fwd_lb(_fwd_lb), rev_lb(_rev_lb), length(_length)
+    bi_fm_index_cursor_ng5(index_t const & _index, size_t _fwd_lb, size_t _rev_lb, size_t _length, size_t _depth) noexcept : index(&_index),
+                                                          fwd_lb(_fwd_lb), rev_lb(_rev_lb), length(_length), depth(_depth)
     {}
 
 
     //\}
 
-    /*!\brief Tries to extend the query by the character `c` to the right.
-     * \tparam char_t Type of the character; needs to be convertible to the character type `char_type` of the index.
-     * \param[in] c Character to extend the query with to the right.
-     * \returns `true` if the cursor could extend the query successfully.
-     *
-     * ### Complexity
-     *
-     * \f$O(T_{BACKWARD\_SEARCH})\f$
-     *
-     * ### Exceptions
-     *
-     * No-throw guarantee.
-     */
     auto extend_right(size_type const c) const noexcept
     {
         auto& csa = index->fwd_fm.index;
         size_type const c_begin = csa.C[c];
         auto      const [rank_l, s, b] = csa.wavelet_tree.lex_count(fwd_lb, fwd_lb+length, c);
-        return bi_fm_index_cursor_ng2{*index, c_begin + rank_l, rev_lb + s, length -b -s};
+        return bi_fm_index_cursor_ng5{*index, c_begin + rank_l, rev_lb + s, length -b -s, depth+1};
     }
-    /*!\brief Tries to extend the query by the character `c` to the left.
-     * \tparam char_t Type of the character needs to be convertible to the character type `char_type` of the index.
-     * \param[in] c Character to extend the query with to the left.
-     * \returns `true` if the cursor could extend the query successfully.
-     *
-     * ### Complexity
-     *
-     * \f$O(T_{BACKWARD\_SEARCH})\f$
-     *
-     * ### Exceptions
-     *
-     * No-throw guarantee.
-     */
     auto extend_left(size_type c) const noexcept
     {
         auto& csa = index->rev_fm.index;
         size_type const c_begin = csa.C[c];
         auto      const [rank_l, s, b] = csa.wavelet_tree.lex_count(rev_lb, rev_lb+length, c);
-        return bi_fm_index_cursor_ng2{*index, fwd_lb + s, c_begin + rank_l, length -b -s};
-
+        return bi_fm_index_cursor_ng5{*index, fwd_lb + s, c_begin + rank_l, length -b -s, depth+1};
     }
+
     bool valid() const noexcept {
         return length > 0;
     }
 
-
-
-
-
-    /*!\brief Counts the number of occurrences of the searched query in the text.
-     * \returns Number of occurrences of the searched query in the text.
-     *
-     * ### Complexity
-     *
-     * Constant.
-     *
-     * ### Exceptions
-     *
-     * No-throw guarantee.
-     */
     size_type count() const noexcept
     {
         assert(index != nullptr);
@@ -164,13 +125,13 @@ public:
 
 
     template <typename delegate_t>
-    void locate(delegate_t delegate, size_t length) const
+    void locate(delegate_t delegate) const
     //!\cond
         requires index_t::text_layout_mode == text_layout::collection
     //!\endcond
     {
         assert(index != nullptr);
-        auto os = index->size() - length - 1;
+        auto os = index->size() - depth - 1;
 
         for (size_type i = 0; i < count(); ++i)
         {
@@ -216,22 +177,27 @@ namespace seqan3
 {
 
 template <typename query_t, typename search_scheme_t, typename delegate_t>
-struct Search_ng2 {
+struct Search_ng5 {
 	query_t const& query;
 	std::vector<int> const& dir;
 	search_scheme_t const& search;
 	size_t qidx;
+	size_t schemeIdx;
+	int max_error;
 	delegate_t const& delegate;
+	mutable std::vector<char> actions;
 
 	template <typename cursor_t>
-	Search_ng2(cursor_t const& _cursor, query_t const& _query, std::vector<int> const& _dir, search_scheme_t const& _search, size_t _qidx, delegate_t const& _delegate)
-		: query    {_query}
-		, dir      {_dir}
-		, search   {_search}
-		, qidx     {_qidx}
-		, delegate {_delegate}
+	Search_ng5(cursor_t const& _cursor, query_t const& _query, std::vector<int> const& _dir, search_scheme_t const& _search, size_t _qidx, size_t _schemeIdx, int _max_error, delegate_t const& _delegate)
+		: query     {_query}
+		, dir       {_dir}
+		, search    {_search}
+		, qidx      {_qidx}
+		, schemeIdx {_schemeIdx}
+		, max_error {_max_error}
+		, delegate  {_delegate}
 	{
-		search_next(_cursor, 0, 0);
+		search_next<false, false, true>(_cursor, 0, 0);
 	}
 
 	template <typename cursor_t, typename char_t>
@@ -242,41 +208,76 @@ struct Search_ng2 {
 		return cur.extend_left(c);
 	}
 
-	template <typename cursor_t>
+	template <int substitution, bool insertion, bool deletion, bool substituteSinceMatch = false, typename cursor_t>
 	void search_next(cursor_t&& cur, int e, size_t pos) const noexcept {
 		if (not cur.valid()) {
 			return;
 		}
-
 		if (pos == query.size()) {
-			delegate(qidx, cur);
+			//if constexpr(deletion and not substituteSinceMatch) {
+			if constexpr(substitution) {
+				actions.push_back('\0');
+				delegate(qidx, schemeIdx, cur, actions);
+				actions.pop_back();
+			}
 			return;
 		}
-		if (search.l[pos] <= e and e <= search.u[pos]) {
-			search_next(extend(cur, pos, query[search.pi[pos]]), e, pos+1);
-		}
 
+
+		// match
+		if (search.l[pos] <= e and e <= search.u[pos]) {
+			actions.push_back('M');
+			search_next<true, true, true>(extend(cur, pos, query[search.pi[pos]]), e, pos+1);
+			actions.pop_back();
+		}
 		if (search.l[pos] <= e+1 and e+1 <= search.u[pos]) {
-			auto rank = query[search.pi[pos]];
-			for (size_t i{1}; i < rank; ++i) {
-				search_next(extend(cur, pos, i), e+1, pos+1);
+			if constexpr (substitution or insertion) {
+				auto rank = query[search.pi[pos]];
+				for (size_t i{1}; i < rank; ++i) {
+					auto newCur = extend(cur, pos, i);
+					if constexpr (substitution) {
+						actions.push_back('S');
+						search_next<true, true, true, true>(newCur, e+1, pos+1); // as substitution
+						actions.pop_back();
+					}
+					if constexpr (insertion) {
+						actions.push_back('I');
+						search_next<false, true, false, substituteSinceMatch>(newCur, e+1, pos);   // as insertion
+						actions.pop_back();
+					}
+				}
+				for (size_t i{rank+1ul}; i < 5ul; ++i) {
+					auto newCur = extend(cur, pos, i);
+					if constexpr (substitution) {
+						actions.push_back('S');
+						search_next<true, true, true, true>(newCur, e+1, pos+1); // as substitution
+						actions.pop_back();
+					}
+					if constexpr (insertion) {
+						actions.push_back('I');
+						search_next<false, true, false, substituteSinceMatch>(newCur, e+1, pos);   // as insertion
+						actions.pop_back();
+					}
+				}
 			}
-			for (size_t i{rank+1ul}; i < 5ul; ++i) {
-				search_next(extend(cur, pos, i), e+1, pos+1);
+			// deletion
+			if constexpr (deletion) {
+				actions.push_back('D');
+				search_next<false, false, true, substituteSinceMatch>(cur, e+1, pos+1);
+				actions.pop_back();
 			}
 		}
 	}
 };
 
 template <typename index_t, typename queries_t, typename search_schemes_t, typename delegate_t>
-void search_ng2(index_t const & index, queries_t && queries, uint8_t _max_error, search_schemes_t const & search_scheme, delegate_t && delegate)
+void search_ng5(index_t const & index, queries_t && queries, uint8_t _max_error, search_schemes_t const & search_scheme, delegate_t && delegate)
 {
-    auto length = queries[0].size();
-    auto internal_delegate = [&delegate, length] (size_t qidx, auto const & it)
+    auto internal_delegate = [&delegate] (size_t qidx, size_t schemeIdx, auto const & it, auto const& actions) noexcept
     {
-        it.locate([&](auto p1, auto p2) {
-            delegate(qidx, std::make_pair(p1, p2));
-        }, length);
+        it.locate([&](auto p1, auto p2) noexcept {
+            delegate(qidx, schemeIdx, std::make_pair(p1, p2), actions);
+        });
     };
     std::vector<std::vector<int>> dirs;
     for (auto const& search : search_scheme) {
@@ -286,14 +287,14 @@ void search_ng2(index_t const & index, queries_t && queries, uint8_t _max_error,
         }
     }
 
-    auto rootCursor = bi_fm_index_cursor_ng2{index};
+    auto rootCursor = bi_fm_index_cursor_ng5{index};
     for (size_t i{0}; i < queries.size(); ++i) {
         auto const& query = queries[i];
         auto realQuery = rootCursor.convert(query);
         for (size_t j{0}; j < search_scheme.size(); ++j) {
             auto const& search = search_scheme[j];
             auto const& dir   = dirs[j];
-            Search_ng2{rootCursor, realQuery, dir, search, i, internal_delegate};
+            Search_ng5{rootCursor, realQuery, dir, search, i, j, _max_error, internal_delegate};
         }
     }
 }

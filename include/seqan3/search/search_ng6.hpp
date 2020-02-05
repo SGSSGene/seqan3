@@ -30,7 +30,10 @@
 #include <seqan3/search/fm_index/bi_fm_index.hpp>
 #include <seqan3/std/ranges>
 
-namespace seqan3 {
+#include "search_ng6_queryindex.hpp"
+
+namespace seqan3
+{
 
 /*!\addtogroup submodule_fm_index
  * \{
@@ -58,7 +61,7 @@ namespace seqan3 {
  * running times, you have to additionally look up the running times of the used traits (configuration).
  */
 template <typename index_t>
-class bi_fm_index_cursor_ng2
+class bi_fm_index_cursor_ng6
 {
 public:
     using size_type  = typename index_t::size_type;
@@ -70,6 +73,7 @@ private:
     size_type fwd_lb;
     size_type rev_lb;
     size_type length;
+    size_type depth;
 
 public:
     /*!\name Constructors, destructor and assignment
@@ -78,19 +82,19 @@ public:
     //!\brief Default constructor. Accessing member functions on a default constructed object is undefined behavior.
     //        Default construction is necessary to make this class semi-regular and e.g., to allow construction of
     //        std::array of cursors.
-    bi_fm_index_cursor_ng2() noexcept = default;                                       //!< Defaulted.
-    bi_fm_index_cursor_ng2(bi_fm_index_cursor_ng2 const &) noexcept = default;             //!< Defaulted.
-    bi_fm_index_cursor_ng2 & operator=(bi_fm_index_cursor_ng2 const &) noexcept = default; //!< Defaulted.
-    bi_fm_index_cursor_ng2(bi_fm_index_cursor_ng2 &&) noexcept = default;                  //!< Defaulted.
-    bi_fm_index_cursor_ng2 & operator=(bi_fm_index_cursor_ng2 &&) noexcept = default;      //!< Defaulted.
-    ~bi_fm_index_cursor_ng2() = default;                                               //!< Defaulted.
+    bi_fm_index_cursor_ng6() noexcept = default;                                       //!< Defaulted.
+    bi_fm_index_cursor_ng6(bi_fm_index_cursor_ng6 const &) noexcept = default;             //!< Defaulted.
+    bi_fm_index_cursor_ng6 & operator=(bi_fm_index_cursor_ng6 const &) noexcept = default; //!< Defaulted.
+    bi_fm_index_cursor_ng6(bi_fm_index_cursor_ng6 &&) noexcept = default;                  //!< Defaulted.
+    bi_fm_index_cursor_ng6 & operator=(bi_fm_index_cursor_ng6 &&) noexcept = default;      //!< Defaulted.
+    ~bi_fm_index_cursor_ng6() = default;                                               //!< Defaulted.
 
     //! \brief Construct from given index.
-    bi_fm_index_cursor_ng2(index_t const & _index) noexcept : index(&_index),
-                                                          fwd_lb(0), rev_lb(0), length(index->size())
+    bi_fm_index_cursor_ng6(index_t const & _index) noexcept : index(&_index),
+                                                          fwd_lb(0), rev_lb(0), length(index->size()), depth(0)
     {}
-    bi_fm_index_cursor_ng2(index_t const & _index, size_t _fwd_lb, size_t _rev_lb, size_t _length) noexcept : index(&_index),
-                                                          fwd_lb(_fwd_lb), rev_lb(_rev_lb), length(_length)
+    bi_fm_index_cursor_ng6(index_t const & _index, size_t _fwd_lb, size_t _rev_lb, size_t _length, size_t _depth) noexcept : index(&_index),
+                                                          fwd_lb(_fwd_lb), rev_lb(_rev_lb), length(_length), depth(_depth)
     {}
 
 
@@ -113,8 +117,8 @@ public:
     {
         auto& csa = index->fwd_fm.index;
         size_type const c_begin = csa.C[c];
-        auto      const [rank_l, s, b] = csa.wavelet_tree.lex_count(fwd_lb, fwd_lb+length, c);
-        return bi_fm_index_cursor_ng2{*index, c_begin + rank_l, rev_lb + s, length -b -s};
+        auto      const [rank_l, s, b] = csa.wavelet_tree.lex_count_fast(fwd_lb, fwd_lb+length, c);
+        return bi_fm_index_cursor_ng6{*index, c_begin + rank_l, rev_lb + s, length -b -s, depth+1};
     }
     /*!\brief Tries to extend the query by the character `c` to the left.
      * \tparam char_t Type of the character needs to be convertible to the character type `char_type` of the index.
@@ -133,8 +137,8 @@ public:
     {
         auto& csa = index->rev_fm.index;
         size_type const c_begin = csa.C[c];
-        auto      const [rank_l, s, b] = csa.wavelet_tree.lex_count(rev_lb, rev_lb+length, c);
-        return bi_fm_index_cursor_ng2{*index, fwd_lb + s, c_begin + rank_l, length -b -s};
+        auto      const [rank_l, s, b] = csa.wavelet_tree.lex_count_fast(rev_lb, rev_lb+length, c);
+        return bi_fm_index_cursor_ng6{*index, fwd_lb + s, c_begin + rank_l, length -b -s, depth+1};
 
     }
     bool valid() const noexcept {
@@ -164,13 +168,13 @@ public:
 
 
     template <typename delegate_t>
-    void locate(delegate_t delegate, size_t length) const
+    void locate(delegate_t delegate) const
     //!\cond
         requires index_t::text_layout_mode == text_layout::collection
     //!\endcond
     {
         assert(index != nullptr);
-        auto os = index->size() - length - 1;
+        auto os = index->size() - depth - 1;
 
         for (size_type i = 0; i < count(); ++i)
         {
@@ -215,69 +219,190 @@ public:
 namespace seqan3
 {
 
-template <typename query_t, typename search_scheme_t, typename delegate_t>
-struct Search_ng2 {
-	query_t const& query;
+template <bool editDistance, typename queries_t, typename index_t, typename search_scheme_t, typename delegate_t>
+struct Search_ng6 {
+	queries_t const& queries;
+	index_t const& index;
+	using query_t = typename queries_t::value_type;
+	std::vector<std::tuple<size_t, int>>& errors;
 	std::vector<int> const& dir;
 	search_scheme_t const& search;
-	size_t qidx;
 	delegate_t const& delegate;
+	using iter_t = BiIter;
+	constexpr static size_t sigma = 4;
 
 	template <typename cursor_t>
-	Search_ng2(cursor_t const& _cursor, query_t const& _query, std::vector<int> const& _dir, search_scheme_t const& _search, size_t _qidx, delegate_t const& _delegate)
-		: query    {_query}
+	Search_ng6(cursor_t const& _cursor, queries_t const& _queries, index_t const& _index, std::vector<std::tuple<size_t, int>>& _errors, std::vector<int> const& _dir, search_scheme_t const& _search, delegate_t const& _delegate)
+		: queries  {_queries}
+		, index    {_index}
+		, errors   {_errors}
 		, dir      {_dir}
 		, search   {_search}
-		, qidx     {_qidx}
 		, delegate {_delegate}
 	{
-		search_next(_cursor, 0, 0);
+		if constexpr (editDistance) {
+			search_next<false, false, true>(_cursor, 0, 0, index.begin(search.pi[0]));
+		} else {
+			search_next<true, false, false>(_cursor, 0, 0, index.begin(search.pi[0]));
+		}
+
 	}
 
 	template <typename cursor_t, typename char_t>
-	auto extend(cursor_t&& cur, int pos, char_t c) const noexcept {
+	auto extend(cursor_t const& cur, int pos, char_t c) const noexcept {
+		//auto c = (typename index_t::alphabet_type)(_c);
 		if (dir[pos] > 0) {
 			return cur.extend_right(c);
 		}
 		return cur.extend_left(c);
 	}
 
-	template <typename cursor_t>
-	void search_next(cursor_t&& cur, int e, size_t pos) const noexcept {
-		if (not cur.valid()) {
+	auto extendQuery(iter_t const& iter, int pos, size_t c2) const noexcept {
+		if (dir[pos] > 0) {
+			return index.extend_right(iter, c2);
+		}
+		return index.extend_left(iter, c2);
+	}
+
+
+	template <bool substitution, bool insertion, bool deletion, typename cursor_t>
+	void search_next(cursor_t const& cur, int e, size_t pos, iter_t searchIter) noexcept {
+		if (not searchIter.valid() or not cur.valid()) {
 			return;
 		}
 
-		if (pos == query.size()) {
-			delegate(qidx, cur);
-			return;
+/*		if (searchIter.fwdIter.start >= index.fwdIndex.db.size() or searchIter.fwdIter.end > index.fwdIndex.db.size()) {
+			throw std::runtime_error("something went wrong");
 		}
-		if (search.l[pos] <= e and e <= search.u[pos]) {
-			search_next(extend(cur, pos, query[search.pi[pos]]), e, pos+1);
-		}
+		if (searchIter.revIter.start >= index.revIndex.db.size() or searchIter.revIter.end > index.revIndex.db.size()) {
+			throw std::runtime_error("something went wrong2");
+		}*/
 
-		if (search.l[pos] <= e+1 and e+1 <= search.u[pos]) {
-			auto rank = query[search.pi[pos]];
-			for (size_t i{1}; i < rank; ++i) {
-				search_next(extend(cur, pos, i), e+1, pos+1);
+		if (pos == queries[0].size()) {
+			if constexpr (substitution) {
+				for (auto i{searchIter.fwdIter.start}; i <= searchIter.fwdIter.end; ++i) {
+					auto qidx = index.fwdIndex.db[i];
+					delegate(qidx, cur);
+				}
 			}
-			for (size_t i{rank+1ul}; i < 5ul; ++i) {
-				search_next(extend(cur, pos, i), e+1, pos+1);
+			return;
+		}
+
+		if (searchIter.size() < sigma*2) {
+			for (auto i{searchIter.fwdIter.start}; i <= searchIter.fwdIter.end; ++i) {
+				single_search_next<substitution, insertion, deletion>(cur, index.fwdIndex.db[i], e, pos);
+			}
+			return;
+		}
+
+		std::array<cursor_t, sigma> cursors;
+		std::array<iter_t, sigma>   iters;
+		for (size_t i{0}; i < sigma; ++i) {
+			cursors[i] = extend(cur, pos, i+1);
+			iters[i]   = extendQuery(searchIter, pos, i);
+		}
+
+		// match
+		if (search.l[pos] <= e and e <= search.u[pos]) {
+			for (size_t c{0}; c < sigma; ++c) {
+				search_next<true, true, true>(cursors[c], e, pos+1, iters[c]);
+			}
+		}
+		if (search.l[pos] <= e+1 and e+1 <= search.u[pos]) {
+			// substitution
+			if constexpr (substitution) {
+				for (size_t c{0}; c < sigma; ++c) {
+					for (size_t c2{0}; c2 < sigma; ++c2) {
+						if (c == c2) continue;
+						search_next<true, true, true>(cursors[c], e+1, pos+1, iters[c2]);
+					}
+				}
+			}
+			if constexpr (editDistance) {
+				// insertion
+				if constexpr (insertion) {
+					for (size_t c{0}; c < sigma; ++c) {
+						search_next<false, true, false>(cursors[c], e+1, pos, searchIter);
+					}
+				}
+				// deletion
+				if constexpr (deletion) {
+					for (size_t c{0}; c < sigma; ++c) {
+						search_next<false, false, true>(cur, e+1, pos+1, iters[c]);
+					}
+				}
 			}
 		}
 	}
+
+	template <int substitution, bool insertion, bool deletion, typename cursor_t>
+	void single_search_next(cursor_t&& cur, size_t qid, int e, size_t pos) const noexcept {
+		if (not cur.valid()) {
+			return;
+		}
+		auto const& query = queries[qid];
+
+		if (pos == query.size()) {
+			//if constexpr(deletion and not substituteSinceMatch) {
+			if constexpr(substitution) {
+				delegate(qid, cur);
+			}
+			return;
+		}
+
+
+		// match
+		if (search.l[pos] <= e and e <= search.u[pos]) {
+			single_search_next<true, true, true>(extend(cur, pos, query[search.pi[pos]]), qid, e, pos+1);
+		}
+		if (search.l[pos] <= e+1 and e+1 <= search.u[pos]) {
+			if constexpr (substitution or insertion) {
+				auto rank = query[search.pi[pos]];
+				for (size_t i{1}; i < rank; ++i) {
+					auto newCur = extend(cur, pos, i);
+					if constexpr (substitution) {
+						single_search_next<true, true, true>(newCur, qid, e+1, pos+1); // as substitution
+					}
+					if constexpr (insertion and editDistance) {
+						single_search_next<false, true, false>(newCur, qid, e+1, pos);   // as insertion
+					}
+				}
+				for (size_t i{rank+1ul}; i < 5ul; ++i) {
+					auto newCur = extend(cur, pos, i);
+					if constexpr (substitution) {
+						single_search_next<true, true, true>(newCur, qid, e+1, pos+1); // as substitution
+					}
+					if constexpr (insertion and editDistance) {
+						single_search_next<false, true, false>(newCur, qid, e+1, pos);   // as insertion
+					}
+				}
+			}
+			// deletion
+			if constexpr (deletion and editDistance) {
+				single_search_next<false, false, true>(cur, qid, e+1, pos+1);
+			}
+		}
+	}
+
 };
 
-template <typename index_t, typename queries_t, typename search_schemes_t, typename delegate_t>
-void search_ng2(index_t const & index, queries_t && queries, uint8_t _max_error, search_schemes_t const & search_scheme, delegate_t && delegate)
+/*template <bool editDistance, typename cursor_t, typename queries_t, typename index_t, typename search_scheme_t, typename delegate_t>
+Search_ng6(cursor_t const&, queries_t const&, index_t const&, std::vector<std::tuple<size_t, int>>& _errors, std::vector<int> const& _dir, search_scheme_t const&, delegate_t const& _delegate)
+	-> Search_ng6<editDistance, queries_t, index_t, search_scheme_t, delegate_t>;
+*/
+
+template <bool editDistance = true, typename index_t, typename queries_t, typename search_schemes_t, typename delegate_t>
+void search_ng6(index_t const & index, queries_t && queries, uint8_t _max_error, search_schemes_t const & search_scheme, delegate_t && delegate)
 {
     auto length = queries[0].size();
     auto internal_delegate = [&delegate, length] (size_t qidx, auto const & it)
     {
         it.locate([&](auto p1, auto p2) {
             delegate(qidx, std::make_pair(p1, p2));
-        }, length);
+        });
     };
+
+    BiIndex biIndex(queries);
     std::vector<std::vector<int>> dirs;
     for (auto const& search : search_scheme) {
         dirs.push_back(std::vector<int>{1});
@@ -286,15 +411,23 @@ void search_ng2(index_t const & index, queries_t && queries, uint8_t _max_error,
         }
     }
 
-    auto rootCursor = bi_fm_index_cursor_ng2{index};
-    for (size_t i{0}; i < queries.size(); ++i) {
-        auto const& query = queries[i];
-        auto realQuery = rootCursor.convert(query);
-        for (size_t j{0}; j < search_scheme.size(); ++j) {
-            auto const& search = search_scheme[j];
-            auto const& dir   = dirs[j];
-            Search_ng2{rootCursor, realQuery, dir, search, i, internal_delegate};
-        }
+    auto rootCursor = bi_fm_index_cursor_ng6{index};
+    auto realQueries = std::vector<std::vector<size_t>>{};
+    for (auto const& query : queries) {
+        realQueries.emplace_back(rootCursor.convert(query));
+    }
+    std::vector<std::tuple<size_t, int>> errors;
+	for (size_t idx{0}; idx < queries.size(); ++idx) {
+		errors.emplace_back(idx, 0);
+	}
+
+    for (size_t j{0}; j < search_scheme.size(); ++j) {
+        auto const& search = search_scheme[j];
+        auto const& dir   = dirs[j];
+//        for (size_t i{0}; i < realQueries.size(); ++i) {
+  //          auto const& query = realQueries[i];
+            Search_ng6<editDistance, decltype(realQueries), decltype(biIndex), decltype(search), decltype(internal_delegate)>{rootCursor, realQueries, biIndex, errors, dir, search, internal_delegate};
+//        }
     }
 }
 
