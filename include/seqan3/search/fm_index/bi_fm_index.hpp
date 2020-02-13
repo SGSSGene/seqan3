@@ -157,7 +157,7 @@ private:
         auto rev_text = text | views::deep{std::views::reverse} | std::views::reverse;
 
         fwd_fm = fm_index_type{text};
-        rev_fm = fm_index_type{rev_text};
+        rev_fm = fm_index_type{rev_text, true};
     }
 
 public:

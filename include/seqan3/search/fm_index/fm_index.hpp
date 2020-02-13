@@ -229,7 +229,7 @@ private:
     //!\cond
         requires (text_layout_mode_ == text_layout::collection)
     //!\endcond
-    void construct(text_t && text)
+    void construct(text_t && text, bool rev = false)
     {
         static_assert(std::ranges::bidirectional_range<text_t>, "The text collection must model bidirectional_range.");
         static_assert(std::ranges::bidirectional_range<std::ranges::range_reference_t<text_t>>,
@@ -279,7 +279,7 @@ private:
         text_begin_rs = sdsl::rank_support_sd<1>(&text_begin);
 
         // last text in collection needs no delimiter if we have more than one text in the collection
-        sdsl::int_vector<8> tmp_text(text_size - (std::ranges::distance(text) > 1));
+        sdsl::int_vector<8> tmp_text(text_size - 1);
 
         constexpr uint8_t delimiter = sigma >= 255 ? 255 : sigma + 1;
 
@@ -305,11 +305,18 @@ private:
                           std::ranges::begin(tmp_text));
 
 
-        // we need at least one delimiter
-        if (std::ranges::distance(text) == 1)
-            tmp_text.back() = delimiter;
-
-        std::ranges::reverse(tmp_text);
+        if (rev)
+        {
+            std::ranges::reverse(tmp_text);
+            if (std::ranges::distance(text) == 1)
+                tmp_text.push_back(delimiter);
+        }
+        else
+        {
+            if (std::ranges::distance(text) == 1)
+                tmp_text.push_back(delimiter);
+            std::ranges::reverse(tmp_text);
+        }
 
         sdsl::construct_im(index, tmp_text, 0);
     }
@@ -406,6 +413,12 @@ public:
         construct(std::forward<text_t>(text));
     }
     //!\}
+
+    template <std::ranges::range text_t>
+    fm_index(text_t && text, bool rev)
+    {
+        construct(std::forward<text_t>(text), rev);
+    }
 
     /*!\brief Returns the length of the indexed text including sentinel characters.
      * \returns Returns the length of the indexed text including sentinel characters.
