@@ -65,8 +65,8 @@ class bi_fm_index_cursor_ng6
 {
 public:
     using size_type  = typename index_t::size_type;
+    using alphabet_type = typename index_t::alphabet_type;
 private:
-    using index_alphabet_type = typename index_t::alphabet_type;
 
     index_t const * index;
 
@@ -120,6 +120,22 @@ public:
         auto      const [rank_l, s, b] = csa.wavelet_tree.lex_count_fast(fwd_lb, fwd_lb+length, c);
         return bi_fm_index_cursor_ng6{*index, c_begin + rank_l, rev_lb + s, length -b -s, depth+1};
     }
+
+    template <typename CB>
+    void extend_right_cb(CB&& cb) const noexcept {
+		auto& csa = index->fwd_fm.index;
+		csa.wavelet_tree.lex_count_fast_cb(fwd_lb, fwd_lb+length, [&](size_t rank_l, size_t s, size_t b, size_t depth, size_t path) {
+			if (path == 0 or path == 255) return; // !TODO maybe just ignore the csa.C lookup, it could be useful
+/*			if (path == 0) {
+				path = 6;
+			}*/
+			size_type c = path;
+	        size_type const c_begin = csa.C[c];
+	        //fmt::print("report_r_cb {} {} ({} {} {}) ({} {} {})\n", c, c_begin, rank_l, s, b, fwd_lb, rev_lb, length);
+	        cb(c, bi_fm_index_cursor_ng6{*index, c_begin + rank_l, rev_lb + s, length -b -s, depth+1});
+		});
+    }
+
     /*!\brief Tries to extend the query by the character `c` to the left.
      * \tparam char_t Type of the character needs to be convertible to the character type `char_type` of the index.
      * \param[in] c Character to extend the query with to the left.
@@ -141,6 +157,24 @@ public:
         return bi_fm_index_cursor_ng6{*index, fwd_lb + s, c_begin + rank_l, length -b -s, depth+1};
 
     }
+
+    template <typename CB>
+    void extend_left_cb(CB&& cb) const noexcept
+    {
+
+        auto& csa = index->rev_fm.index;
+		csa.wavelet_tree.lex_count_fast_cb(rev_lb, rev_lb+length, [&](size_t rank_l, size_t s, size_t b, size_t depth, size_t path) {
+			if (path == 0 or path == 255) return; // !TODO maybe just ignore the csa.C lookup, it could be useful
+			/*if (path == 0) {
+				path = 6;
+			}*/
+			size_type c = path;
+	        size_type const c_begin = csa.C[c];
+	        //fmt::print("report_l_cb {} {} ({} {} {}) ({} {} {})\n", c, c_begin, rank_l, s, b, fwd_lb, rev_lb, length);
+	        cb(c, bi_fm_index_cursor_ng6{*index, fwd_lb + s, c_begin + rank_l, length -b -s, depth+1});
+		});
+    }
+
     bool valid() const noexcept {
         return length > 0;
     }
@@ -189,14 +223,14 @@ public:
         using fwd_alphabet_t = typename decltype(index->fwd_fm.index)::alphabet_type;
         using rev_alphabet_t = typename decltype(index->rev_fm.index)::alphabet_type;
 
-        static_assert(std::convertible_to<char_t, index_alphabet_type>,
+        static_assert(std::convertible_to<char_t, alphabet_type>,
                      "The character must be convertible to the alphabet of the index.");
         static_assert(std::is_same_v<fwd_alphabet_t, rev_alphabet_t>);
-//        static_assert(std::is_same_v<fwd_alphabet_t, index_alphabet_type>);
+//        static_assert(std::is_same_v<fwd_alphabet_t, alphabet_type>);
 
         auto realQuery = std::vector<size_t>(query.size());
         for (size_t k{0}; k < query.size(); ++k) {
-            auto c = to_rank(static_cast<index_alphabet_type>(query[k])) + 1;
+            auto c = to_rank(static_cast<alphabet_type>(query[k])) + 1;
             size_t cc = c;
             if constexpr(!std::same_as<fwd_alphabet_t, sdsl::plain_byte_alphabet>)
             {
@@ -219,7 +253,7 @@ public:
 namespace seqan3
 {
 
-template <bool editDistance, typename queries_t, typename index_t, typename search_scheme_t, typename delegate_t>
+template <bool editDistance, bool fast_lex, typename cursor_t, typename queries_t, typename index_t, typename search_scheme_t, typename delegate_t>
 struct Search_ng6 {
 	queries_t const& queries;
 	index_t const& index;
@@ -229,9 +263,10 @@ struct Search_ng6 {
 	search_scheme_t const& search;
 	delegate_t const& delegate;
 	using iter_t = BiIter;
-	constexpr static size_t sigma = 4;
 
-	template <typename cursor_t>
+	using alphabet_type = typename cursor_t::alphabet_type;
+	constexpr static size_t sigma = alphabet_type::alphabet_size;
+
 	Search_ng6(cursor_t const& _cursor, queries_t const& _queries, index_t const& _index, std::vector<std::tuple<size_t, int>>& _errors, std::vector<int> const& _dir, search_scheme_t const& _search, delegate_t const& _delegate)
 		: queries  {_queries}
 		, index    {_index}
@@ -248,7 +283,7 @@ struct Search_ng6 {
 
 	}
 
-	template <typename cursor_t, typename char_t>
+	template <typename char_t>
 	auto extend(cursor_t const& cur, int pos, char_t c) const noexcept {
 		//auto c = (typename index_t::alphabet_type)(_c);
 		if (dir[pos] > 0) {
@@ -256,6 +291,16 @@ struct Search_ng6 {
 		}
 		return cur.extend_left(c);
 	}
+
+	template <typename CB>
+	void extend_cb(cursor_t const& cur, int pos, CB&& cb) const noexcept {
+		if (dir[pos] > 0) {
+			cur.extend_right_cb(std::forward<CB>(cb));
+		} else {
+			cur.extend_left_cb(std::forward<CB>(cb));
+		}
+	}
+
 
 	auto extendQuery(iter_t const& iter, int pos, size_t c2) const noexcept {
 		if (dir[pos] > 0) {
@@ -265,7 +310,7 @@ struct Search_ng6 {
 	}
 
 
-	template <bool substitution, bool insertion, bool deletion, typename cursor_t>
+	template <bool substitution, bool insertion, bool deletion>
 	void search_next(cursor_t const& cur, int e, size_t pos, iter_t searchIter) noexcept {
 		if (not searchIter.valid() or not cur.valid()) {
 			return;
@@ -297,9 +342,19 @@ struct Search_ng6 {
 
 		std::array<cursor_t, sigma> cursors;
 		std::array<iter_t, sigma>   iters;
-		for (size_t i{0}; i < sigma; ++i) {
-			cursors[i] = extend(cur, pos, i+1);
-			iters[i]   = extendQuery(searchIter, pos, i);
+		if constexpr (fast_lex) {
+			extend_cb(cur, pos, [&](auto c, auto newCur) {
+				if (c > sigma) return;
+				cursors[c-1] = newCur;
+			});
+			for (size_t i{0}; i < sigma; ++i) {
+				iters[i]   = extendQuery(searchIter, pos, i);
+			}
+		} else {
+			for (size_t i{0}; i < sigma; ++i) {
+				cursors[i] = extend(cur, pos, i+1);
+				iters[i]   = extendQuery(searchIter, pos, i);
+			}
 		}
 
 		// match
@@ -335,8 +390,8 @@ struct Search_ng6 {
 		}
 	}
 
-	template <int substitution, bool insertion, bool deletion, typename cursor_t>
-	void single_search_next(cursor_t&& cur, size_t qid, int e, size_t pos) const noexcept {
+	template <int substitution, bool insertion, bool deletion>
+	void single_search_next(cursor_t const& cur, size_t qid, int e, size_t pos) const noexcept {
 		if (not cur.valid()) {
 			return;
 		}
@@ -350,16 +405,30 @@ struct Search_ng6 {
 			return;
 		}
 
+		std::array<cursor_t, sigma> cursors;
+		if constexpr (fast_lex) {
+			extend_cb(cur, pos, [&](auto c, auto newCur) {
+				if (c > sigma) return;
+				cursors[c-1] = newCur;
+			});
+		} else {
+			for (size_t i{0}; i < sigma; ++i) {
+				cursors[i] = extend(cur, pos, i+1);
+			}
+		}
+
+
 
 		// match
 		if (search.l[pos] <= e and e <= search.u[pos]) {
-			single_search_next<true, true, true>(extend(cur, pos, query[search.pi[pos]]), qid, e, pos+1);
+			auto c = query[search.pi[pos]];
+			single_search_next<true, true, true>(cursors[c-1], qid, e, pos+1);
 		}
 		if (search.l[pos] <= e+1 and e+1 <= search.u[pos]) {
 			if constexpr (substitution or insertion) {
 				auto rank = query[search.pi[pos]];
 				for (size_t i{1}; i < rank; ++i) {
-					auto newCur = extend(cur, pos, i);
+					auto newCur = cursors[i-1];
 					if constexpr (substitution) {
 						single_search_next<true, true, true>(newCur, qid, e+1, pos+1); // as substitution
 					}
@@ -367,8 +436,8 @@ struct Search_ng6 {
 						single_search_next<false, true, false>(newCur, qid, e+1, pos);   // as insertion
 					}
 				}
-				for (size_t i{rank+1ul}; i < 5ul; ++i) {
-					auto newCur = extend(cur, pos, i);
+				for (size_t i{rank+1ul}; i <= sigma; ++i) {
+					auto newCur = cursors[i-1];
 					if constexpr (substitution) {
 						single_search_next<true, true, true>(newCur, qid, e+1, pos+1); // as substitution
 					}
@@ -391,7 +460,7 @@ Search_ng6(cursor_t const&, queries_t const&, index_t const&, std::vector<std::t
 	-> Search_ng6<editDistance, queries_t, index_t, search_scheme_t, delegate_t>;
 */
 
-template <bool editDistance = true, typename index_t, typename queries_t, typename search_schemes_t, typename delegate_t>
+template <bool editDistance = true, bool fast_lex = true, typename index_t, typename queries_t, typename search_schemes_t, typename delegate_t>
 void search_ng6(index_t const & index, queries_t && queries, uint8_t _max_error, search_schemes_t const & search_scheme, delegate_t && delegate)
 {
     auto length = queries[0].size();
@@ -426,7 +495,7 @@ void search_ng6(index_t const & index, queries_t && queries, uint8_t _max_error,
         auto const& dir   = dirs[j];
 //        for (size_t i{0}; i < realQueries.size(); ++i) {
   //          auto const& query = realQueries[i];
-            Search_ng6<editDistance, decltype(realQueries), decltype(biIndex), decltype(search), decltype(internal_delegate)>{rootCursor, realQueries, biIndex, errors, dir, search, internal_delegate};
+            Search_ng6<editDistance, fast_lex, decltype(rootCursor), decltype(realQueries), decltype(biIndex), decltype(search), decltype(internal_delegate)>{rootCursor, realQueries, biIndex, errors, dir, search, internal_delegate};
 //        }
     }
 }

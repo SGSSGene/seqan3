@@ -247,13 +247,10 @@ void search_ss_ng(cursor_t cur, query_t const & query,
 }
 
 
-template <typename index_t, typename query_t, typename search_scheme_t, typename delegate_t>
-void search_ss_ng(index_t const & index, query_t const & query, detail::search_param const error_left,
+template <typename index_t, typename query_t, typename block_info_t, typename search_scheme_t, typename delegate_t>
+void search_ss_ng(index_t const & index, query_t const & query, block_info_t const& block_info, detail::search_param const error_left,
                       search_scheme_t const & search_scheme, delegate_t && delegate)
 {
-    // retrieve cumulative block lengths and starting position
-    auto const block_info = detail::search_scheme_block_info(search_scheme, std::ranges::size(query));
-
     for (uint8_t search_id = 0; search_id < search_scheme.size(); ++search_id)
     {
         auto const & search = search_scheme[search_id];
@@ -275,8 +272,8 @@ void search_ss_ng(index_t const & index, query_t const & query, detail::search_p
 }
 
 
-template <typename index_t, typename query_t, typename search_schemes_t, typename delegate_t>
-void search_single_ng(index_t const & index, query_t const & query, uint8_t _max_error, search_schemes_t const & search_schemes, delegate_t && delegate)
+template <typename index_t, typename query_t, typename block_info_t, typename search_schemes_t, typename delegate_t>
+void search_single_ng(index_t const & index, query_t const & query, block_info_t const& block_info, uint8_t _max_error, search_schemes_t const & search_schemes, delegate_t && delegate)
 {
     //using search_traits_t = search_traits<configuration_t>;
 
@@ -296,15 +293,18 @@ void search_single_ng(index_t const & index, query_t const & query, uint8_t _max
         }
     };
 
-    search_ss_ng(index, query, max_error, search_schemes, internal_delegate);
+    search_ss_ng(index, query, block_info, max_error, search_schemes, internal_delegate);
 }
 
 
 template <typename index_t, typename queries_t, typename search_schemes_t, typename delegate_t>
 void search_ng(index_t const & index, queries_t && queries, uint8_t max_error, search_schemes_t const & search_schemes, delegate_t && delegate)
 {
+    // retrieve cumulative block lengths and starting position
+    auto const block_info = detail::search_scheme_block_info(search_schemes, std::ranges::size(queries[0]));
+
     for (size_t i{0}; i < queries.size(); ++i) {
-       search_single_ng(index, queries[i], max_error, search_schemes, [i, delegate](auto const& it){
+       search_single_ng(index, queries[i], block_info, max_error, search_schemes, [i, delegate](auto const& it){
            delegate(i, it);
        });
     }

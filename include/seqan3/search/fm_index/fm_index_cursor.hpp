@@ -102,9 +102,6 @@ private:
     friend class bi_fm_index_cursor;
 
     template <typename _index_t>
-    friend class bi_fm_index_cursor_ng2;
-
-    template <typename _index_t>
     friend class bi_fm_index_cursor_ng3;
 
     template <typename _index_t>

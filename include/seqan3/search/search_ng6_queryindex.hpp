@@ -27,7 +27,7 @@ struct Index {
 
 		db        = std::vector<size_t>((sequenceLength+1) * sequenceCount, 0);
 		jump      = std::vector<size_t>(db.size() * alphabet_size, 0);
-		totalJump = std::vector<size_t>(alphabet_size*sequenceLength, 0);
+		totalJump = std::vector<size_t>(alphabet_size*(sequenceLength+1), 0);
 
 		auto currentBegin = db.size();
 		// sort past last column (just use initial order)

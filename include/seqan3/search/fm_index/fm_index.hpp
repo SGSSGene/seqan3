@@ -336,6 +336,9 @@ public:
     using cursor_type = fm_index_cursor<fm_index>;
     //!\}
 
+	template <semialphabet, text_layout, detail::sdsl_index>
+    friend class bi_fm_index;
+
     template <typename bi_fm_index_t>
     friend class bi_fm_index_cursor;
 
@@ -411,6 +414,10 @@ public:
     explicit fm_index(text_t && text)
     {
         construct(std::forward<text_t>(text));
+    }
+
+    void init() {
+    	index.init();
     }
     //!\}
 
