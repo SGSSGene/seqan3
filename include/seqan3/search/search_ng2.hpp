@@ -111,6 +111,27 @@ protected:
 
 public:
 
+	bool overlap(bi_fm_index_cursor_ng2 const& _other) const noexcept {
+		if (fwd_lb +length < _other.fwd_lb) {
+			return false;
+		}
+		if (_other.fwd_lb + _other.length < fwd_lb) {
+			return false;
+		}
+		return true;
+	}
+	auto join(bi_fm_index_cursor_ng2 const& _other) const noexcept {
+		auto new_fwd_lb = std::min(fwd_lb, _other.fwd_lb);
+		auto new_fwd_rb = std::max(fwd_lb+length, _other.fwd_lb + _other.length);
+		auto new_length = new_fwd_rb - new_fwd_lb;
+		//!TODO rev_lb is wrong, this should be a uni cursor
+		return bi_fm_index_cursor_ng2{*index, new_fwd_lb, rev_lb, new_length};
+	}
+
+	bool operator<(bi_fm_index_cursor_ng2 const& _other) const noexcept {
+		return fwd_lb < _other.fwd_lb;
+	}
+
 
     //\}
 
