@@ -159,7 +159,7 @@ void search_ng7(index_t const & index, queries_t && queries, uint8_t _max_error,
     auto internal_delegate = [&delegate, len] (size_t qidx, auto const & it, auto const& actions)
     {
         it.locate([&](auto p1, auto p2) {
-            delegate(qidx, p1, p2, actions);
+            delegate(qidx, p1, p2/*, actions*/);
         }, len);
     };
 

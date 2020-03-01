@@ -320,7 +320,7 @@ void search_ng4(index_t const & index, queries_t && queries, uint8_t _max_error,
     auto internal_delegate = [&delegate, length] (size_t qidx, auto const & it)
     {
         it.locate([&](auto p1, auto p2) {
-            delegate(qidx, std::make_pair(p1, p2));
+            delegate(qidx, p1, p2);
         }, length);
     };
     std::vector<std::vector<int>> dirs;

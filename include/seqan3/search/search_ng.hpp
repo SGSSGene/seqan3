@@ -305,7 +305,8 @@ void search_ng(index_t const & index, queries_t && queries, uint8_t max_error, s
 
     for (size_t i{0}; i < queries.size(); ++i) {
        search_single_ng(index, queries[i], block_info, max_error, search_schemes, [i, delegate](auto const& it){
-           delegate(i, it);
+           auto [gidx, pos] = it;
+           delegate(i, gidx, pos);
        });
     }
 }
