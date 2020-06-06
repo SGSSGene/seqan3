@@ -263,12 +263,11 @@ struct Search_ng11 {
 template <typename index_t, typename queries_t, typename search_schemes_t, typename delegate_t>
 void search_ng11(index_t const & index, queries_t && queries, uint8_t _max_error, search_schemes_t const & search_scheme, delegate_t && delegate)
 {
-	auto len = queries[0].size();
-    auto internal_delegate = [&delegate, len] (size_t qidx, auto const & it, auto const& actions)
+    auto internal_delegate = [&delegate] (size_t qidx, auto const & it, auto const& actions)
     {
         it.locate([&](auto p1, auto p2) {
             delegate(qidx, p1, p2/*, actions*/);
-        }, len);
+        });
     };
 
     std::vector<std::vector<Block_ng11<size_t>>> search_scheme2;

@@ -74,6 +74,7 @@ public: //!TODO
     size_type fwd_lb {};
     size_type rev_lb {};
     size_type length {};
+    size_type depth  {};
 
 public:
     /*!\name Constructors, destructor and assignment
@@ -102,16 +103,21 @@ public:
 	}
 
 protected:
-    bi_fm_index_cursor_ng2(index_t const & _index, size_type _fwd_lb, size_type _rev_lb, size_type _length) noexcept
+public://!TODO
+    bi_fm_index_cursor_ng2(index_t const & _index, size_type _fwd_lb, size_type _rev_lb, size_type _length, size_type _depth) noexcept
       : index  {&_index}
       , fwd_lb {_fwd_lb}
       , rev_lb {_rev_lb}
       , length {_length}
+      , depth  {_depth}
     {}
 
 public:
 
 	bool overlap(bi_fm_index_cursor_ng2 const& _other) const noexcept {
+		if (depth != _other.depth) {
+			return false;
+		}
 		if (fwd_lb +length < _other.fwd_lb) {
 			return false;
 		}
@@ -121,15 +127,17 @@ public:
 		return true;
 	}
 	auto join(bi_fm_index_cursor_ng2 const& _other) const noexcept {
+		assert(overlap(_other));
 		auto new_fwd_lb = std::min(fwd_lb, _other.fwd_lb);
 		auto new_fwd_rb = std::max(fwd_lb+length, _other.fwd_lb + _other.length);
 		auto new_length = new_fwd_rb - new_fwd_lb;
 		//!TODO rev_lb is wrong, this should be a uni cursor
-		return bi_fm_index_cursor_ng2{*index, new_fwd_lb, rev_lb, new_length};
+		return bi_fm_index_cursor_ng2{*index, new_fwd_lb, rev_lb, new_length, depth};
 	}
 
 	bool operator<(bi_fm_index_cursor_ng2 const& _other) const noexcept {
-		return fwd_lb < _other.fwd_lb;
+		return std::tie(depth, fwd_lb) < std::tie(_other.depth, _other.fwd_lb);
+		//return fwd_lb < _other.fwd_lb;
 	}
 
 
@@ -154,7 +162,7 @@ public:
         auto&      csa            = index->fwd_fm.index;
         auto const c_begin        = csa.C[c];
         auto const [rank_l, s, b] = csa.wavelet_tree.lex_count(fwd_lb, fwd_lb+length, c);
-        return bi_fm_index_cursor_ng2{*index, c_begin + rank_l, rev_lb + s, length -b -s};
+        return bi_fm_index_cursor_ng2{*index, c_begin + rank_l, rev_lb + s, length -b -s, depth+1};
     }
 
     /*!\brief Tries to extend the query by the character `c` to the left.
@@ -176,7 +184,7 @@ public:
         auto&      csa            = index->rev_fm.index;
         auto const c_begin        = csa.C[c];
         auto const [rank_l, s, b] = csa.wavelet_tree.lex_count(rev_lb, rev_lb+length, c);
-        return bi_fm_index_cursor_ng2{*index, fwd_lb + s, c_begin + rank_l, length -b -s};
+        return bi_fm_index_cursor_ng2{*index, fwd_lb + s, c_begin + rank_l, length -b -s, depth+1};
     }
 
     template <typename CB>
@@ -184,10 +192,10 @@ public:
         assert(index != nullptr);
 //    	fmt::print("coming from right\n");
 		auto& csa = index->fwd_fm.index;
-		csa.wavelet_tree.lex_count_fast_cb(fwd_lb, fwd_lb+length, [&](size_t rank_l, size_t s, size_t b, size_t depth, size_type c) noexcept {
+		csa.wavelet_tree.lex_count_fast_cb(fwd_lb, fwd_lb+length, [&](size_t rank_l, size_t s, size_t b, size_t, size_type c) noexcept {
 	        size_type const c_begin = csa.C[c];
 	        //fmt::print("report_r_cb {} {} ({} {} {}) ({} {} {})\n", c, c_begin, rank_l, s, b, fwd_lb, rev_lb, length);
-	        cb(c, bi_fm_index_cursor_ng2{*index, c_begin + rank_l, rev_lb + s, length -b -s});
+	        cb(c, bi_fm_index_cursor_ng2{*index, c_begin + rank_l, rev_lb + s, length -b -s, depth+1});
 		});
     }
 
@@ -197,10 +205,10 @@ public:
         assert(index != nullptr);
 //    	fmt::print("coming from left\n");
         auto& csa = index->rev_fm.index;
-		csa.wavelet_tree.lex_count_fast_cb(rev_lb, rev_lb+length, [&](size_t rank_l, size_t s, size_t b, size_t depth, size_type c) noexcept {
+		csa.wavelet_tree.lex_count_fast_cb(rev_lb, rev_lb+length, [&](size_t rank_l, size_t s, size_t b, size_t, size_type c) noexcept {
 	        size_type const c_begin = csa.C[c];
 	        //fmt::print("report_l_cb {} {} ({} {} {}) ({} {} {})\n", c, c_begin, rank_l, s, b, fwd_lb, rev_lb, length);
-	        cb(c, bi_fm_index_cursor_ng2{*index, fwd_lb + s, c_begin + rank_l, length -b -s});
+	        cb(c, bi_fm_index_cursor_ng2{*index, fwd_lb + s, c_begin + rank_l, length -b -s, depth+1});
 		});
     }
 
@@ -232,7 +240,7 @@ public:
 
 
     template <typename delegate_t>
-    void locate(delegate_t delegate, size_t depth) const
+    void locate(delegate_t delegate) const
     //!\cond
         requires index_t::text_layout_mode == text_layout::collection
     //!\endcond
@@ -242,7 +250,7 @@ public:
 
         for (size_type i = 0; i < count(); ++i)
         {
-            if (os < index->fwd_fm.index[fwd_lb + i]) continue;
+            //if (os < index->fwd_fm.index[fwd_lb + i]) continue;
             size_type loc               = os - index->fwd_fm.index[fwd_lb + i];
             size_type sequence_rank     = index->fwd_fm.text_begin_rs.rank(loc + 1);
             size_type sequence_position = loc - index->fwd_fm.text_begin_ss.select(sequence_rank);
@@ -465,7 +473,7 @@ void search_ng2(index_t const & index, queries_t && queries, uint8_t _max_error,
     {
         it.locate([&](auto p1, auto p2) {
             delegate(qidx, p1, p2);
-        }, len);
+        });
     };
     std::vector<std::vector<int>> dirs;
     for (auto const& search : search_scheme) {

@@ -44,7 +44,7 @@ struct Block_ng12 {
 	Dir_ng12 dir;
 };
 
-template <typename index_t, typename search_scheme_t, typename delegate_t>
+template <bool Actions, typename index_t, typename search_scheme_t, typename delegate_t>
 struct Search_ng12 {
 	using cursor_t = bi_fm_index_cursor_ng2<index_t>;
 
@@ -52,10 +52,9 @@ struct Search_ng12 {
 	search_scheme_t const& search;
 	size_t qidx;
 	delegate_t const& delegate;
+	mutable std::deque<char> actions;
 
 	using BlockIter = typename search_scheme_t::const_iterator;
-
-	mutable std::vector<char> actions;
 
 	using index_alphabet_type = typename cursor_t::alphabet_type;
     using index_rank_type     = std::decay_t<decltype(std::declval<index_alphabet_type>().to_rank())>;
@@ -94,6 +93,21 @@ struct Search_ng12 {
 		}
 	}
 
+	template <bool Right>
+	auto push_action(char c) const noexcept {
+		if constexpr (Actions) {
+			if constexpr (Right) {
+				actions.push_back(c);
+				return std::shared_ptr<int>{nullptr, [=](int*) { actions.pop_back(); }};
+			} else {
+				actions.push_front(c);
+				return std::shared_ptr<int>{nullptr, [=](int*) { actions.pop_front(); }};
+			}
+		} else {
+			return nullptr;
+		}
+	}
+
 
 	template <char LInfo, char RInfo>
 	void search_next(cursor_t const& cur, int e, BlockIter blockIter) const noexcept {
@@ -102,9 +116,14 @@ struct Search_ng12 {
 		}
 
 		if (blockIter == end(search)) {
-			if constexpr ((LInfo == 'M' or LInfo == 'I') and (RInfo == 'M' or RInfo == 'I')) {
+			//if constexpr ((LInfo == 'M' or LInfo == 'I') and (RInfo == 'M' or RInfo == 'I')) {
 				delegate(qidx, cur, actions);
-			}
+			//}
+			/*if ((blockIter-1)->dir == Dir_ng12::Right) {
+				search_next_dir_final<LInfo, RInfo, true>(cur, e, blockIter);
+			} else {
+				search_next_dir_final<LInfo, RInfo, false>(cur, e, blockIter);
+			}*/
 			return;
 		}
 		if (blockIter->dir == Dir_ng12::Right) {
@@ -144,6 +163,7 @@ struct Search_ng12 {
 
 			if (matchAllowed) {
 				auto newCur = cursors[rank];
+				auto g = push_action<Right>('M');
 				search_next<OnMatchL, OnMatchR>(newCur, e, blockIter+1);
 			}
 
@@ -151,8 +171,10 @@ struct Search_ng12 {
 				auto newCur = cursors[i];
 
 				if constexpr (Deletion) {
+					auto g = push_action<Right>('D');
 					search_next<OnDeletionL, OnDeletionR>(newCur, e+1, blockIter); // deletion occurred in query
 				}
+				auto g = push_action<Right>('S');
 				search_next<OnSubstituteL, OnSubstituteR>(newCur, e+1, blockIter+1); // as substitution
 			}
 
@@ -160,22 +182,49 @@ struct Search_ng12 {
 				auto newCur = cursors[i];
 
 				if constexpr (Deletion) {
+					auto g = push_action<Right>('D');
 					search_next<OnDeletionL, OnDeletionR>(newCur, e+1, blockIter); // deletion occurred in query
 				}
+				auto g = push_action<Right>('S');
 				search_next<OnSubstituteL, OnSubstituteR>(newCur, e+1, blockIter+1); // as substitution
 			}
 
 
 			if constexpr (Insertion) {
-				search_next_ins<OnInsertionL, OnInsertionR, Right>(cur, e+1, blockIter+1, cursors); // insertion occurred in query
+				auto g = push_action<Right>('I');
+				//search_next_ins<OnInsertionL, OnInsertionR, Right>(cur, e+1, blockIter+1, cursors); // insertion occurred in query
+				search_next<OnInsertionL, OnInsertionR>(cur, e+1, blockIter+1); // insertion occurred in query
+
 			}
 
 
 		} else if (matchAllowed) {
+			auto g = push_action<Right>('M');
+
 			auto newCur = extend<Right>(cur, rank);
 			search_next<OnMatchL, OnMatchR>(newCur, e, blockIter+1);
 		}
 	}
+
+	template <char LInfo, char RInfo, bool Right>
+	void search_next_dir_final(cursor_t const& cur, int e, BlockIter blockIter) const noexcept {
+		static constexpr char TInfo = Right ? RInfo : LInfo;
+
+		bool mismatchAllowed = (blockIter-1)->l <= e+1 and e+1 <= (blockIter-1)->u;
+		if (mismatchAllowed) {
+			auto cursors = std::array<cursor_t, index_sigma+1>{};
+			extend_cb<Right>(cur, [&](auto c, auto newCur) {
+				if (c > index_sigma) return;
+				cursors[c] = newCur;
+			});
+			for (index_rank_type i{1}; i <= index_sigma; ++i) {
+				auto newCur = cursors[i];
+				auto g = push_action<Right>('D');
+				search_next<LInfo, RInfo>(newCur, e+1, blockIter); // deletion occurred in query
+			}
+		}
+	}
+
 
 	template <char LInfo, char RInfo, bool lastDir>
 	void search_next_ins(cursor_t const& cur, int e, BlockIter blockIter, std::array<cursor_t, index_sigma+1> const& cursors) const noexcept {
@@ -187,6 +236,11 @@ struct Search_ng12 {
 			if constexpr ((LInfo == 'M' or LInfo == 'I') and (RInfo == 'M' or RInfo == 'I')) {
 				delegate(qidx, cur, actions);
 			}
+			/*if ((blockIter-1)->dir == Dir_ng12::Right) {
+				search_next_dir_final<LInfo, RInfo, true>(cur, e, blockIter);
+			} else {
+				search_next_dir_final<LInfo, RInfo, false>(cur, e, blockIter);
+			}*/
 			return;
 		}
 		if (lastDir == (blockIter->dir == Dir_ng12::Right)) {
@@ -228,6 +282,7 @@ struct Search_ng12 {
 
 		if (matchAllowed) {
 			auto newCur = cursors[rank];
+			auto g = push_action<Right>('M');
 			search_next<OnMatchL, OnMatchR>(newCur, e, blockIter+1);
 		}
 
@@ -236,8 +291,10 @@ struct Search_ng12 {
 				auto newCur = cursors[i];
 
 				if constexpr (Deletion) {
+					auto g = push_action<Right>('D');
 					search_next<OnDeletionL, OnDeletionR>(newCur, e+1, blockIter); // deletion occurred in query
 				}
+				auto g = push_action<Right>('S');
 				search_next<OnSubstituteL, OnSubstituteR>(newCur, e+1, blockIter+1); // as substitution
 			}
 
@@ -245,13 +302,16 @@ struct Search_ng12 {
 				auto newCur = cursors[i];
 
 				if constexpr (Deletion) {
+					auto g = push_action<Right>('D');
 					search_next<OnDeletionL, OnDeletionR>(newCur, e+1, blockIter); // deletion occurred in query
 				}
+				auto g = push_action<Right>('S');
 				search_next<OnSubstituteL, OnSubstituteR>(newCur, e+1, blockIter+1); // as substitution
 			}
 
 
 			if constexpr (Insertion) {
+				auto g = push_action<Right>('I');
 				search_next_ins<OnInsertionL, OnInsertionR, Right>(cur, e+1, blockIter+1, cursors); // insertion occurred in query
 			}
 		}
@@ -260,13 +320,17 @@ struct Search_ng12 {
 };
 
 
-template <typename index_t, typename queries_t, typename search_schemes_t, typename delegate_t>
+template <bool Actions=false, typename index_t, typename queries_t, typename search_schemes_t, typename delegate_t>
 void search_ng12(index_t const & index, queries_t && queries, uint8_t _max_error, search_schemes_t const & search_scheme, delegate_t && delegate)
 {
 	auto len = queries[0].size();
     auto internal_delegate = [&delegate, len] (size_t qidx, auto const & it, auto const& actions)
     {
-    	delegate(qidx, it);
+    	if constexpr (Actions) {
+	    	delegate(qidx, it, actions);
+	    } else {
+	    	delegate(qidx, it);
+	    }
 #if 0
         it.locate([&](auto p1, auto p2) {
             delegate(qidx, p1, p2/*, actions*/);
@@ -298,7 +362,7 @@ void search_ng12(index_t const & index, queries_t && queries, uint8_t _max_error
             for (size_t k {0}; k < search.size(); ++k) {
                 search[k].rank = index.convert(query[search_scheme[j].pi[k]]);
             }
-            Search_ng12{index, search, i, internal_delegate};
+            Search_ng12<Actions, std::decay_t<decltype(index)>, std::decay_t<decltype(search)>, std::decay_t<decltype(internal_delegate)>>{index, search, i, internal_delegate};
         }
     }
 
