@@ -14,8 +14,8 @@
 
 #include <seqan3/core/algorithm/configuration.hpp>
 #include <seqan3/range/views/persist.hpp>
-#include <seqan3/search/algorithm/detail/search.hpp>
-#include <seqan3/search/algorithm/detail/search_traits.hpp>
+#include <seqan3/search/search.hpp>
+#include <seqan3/search/detail/search_traits.hpp>
 #include <seqan3/search/fm_index/all.hpp>
 #include <seqan3/std/algorithm>
 #include <seqan3/std/ranges>
@@ -44,7 +44,7 @@ struct Search_ng5 {
 	delegate_t const& delegate;
 
 	using index_alphabet_type = typename cursor_t::alphabet_type;
-	using query_alphabet_type = innermost_value_type_t<query_t>;
+	using query_alphabet_type = range_innermost_value_t<query_t>;
     using index_rank_type     = std::decay_t<decltype(std::declval<index_alphabet_type>().to_rank())>;
 
 	constexpr static size_t index_sigma = alphabet_size<index_alphabet_type>;
@@ -173,7 +173,7 @@ void search_ng5(index_t const & index, queries_t && queries, uint8_t _max_error,
         }
     }
 
-	using query_alphabet_t = innermost_value_type_t<queries_t>;
+	using query_alphabet_t = range_innermost_value_t<queries_t>;
     auto rootCursor = bi_fm_index_cursor_ng2<index_t>{index};
     for (size_t i{0}; i < queries.size(); ++i) {
         auto const& query = queries[i];

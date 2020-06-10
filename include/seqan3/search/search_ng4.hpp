@@ -14,8 +14,8 @@
 
 #include <seqan3/core/algorithm/configuration.hpp>
 #include <seqan3/range/views/persist.hpp>
-#include <seqan3/search/algorithm/detail/search.hpp>
-#include <seqan3/search/algorithm/detail/search_traits.hpp>
+#include <seqan3/search/search.hpp>
+#include <seqan3/search/detail/search_traits.hpp>
 #include <seqan3/search/fm_index/all.hpp>
 #include <seqan3/std/algorithm>
 #include <seqan3/std/ranges>

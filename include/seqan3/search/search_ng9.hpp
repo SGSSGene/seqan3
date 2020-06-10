@@ -14,8 +14,8 @@
 
 #include <seqan3/core/algorithm/configuration.hpp>
 #include <seqan3/range/views/persist.hpp>
-#include <seqan3/search/algorithm/detail/search.hpp>
-#include <seqan3/search/algorithm/detail/search_traits.hpp>
+#include <seqan3/search/search.hpp>
+#include <seqan3/search/detail/search_traits.hpp>
 #include <seqan3/search/fm_index/all.hpp>
 #include <seqan3/std/algorithm>
 #include <seqan3/std/ranges>
@@ -205,7 +205,7 @@ void search_ng9(index_t const & index, queries_t && queries, uint8_t _max_error,
         search_scheme2.emplace_back(move(search2));
     }
 
-	using query_alphabet_t = innermost_value_type_t<queries_t>;
+	using query_alphabet_t = range_innermost_value_t<queries_t>;
     for (size_t i{0}; i < queries.size(); ++i) {
         auto const& query = queries[i];
         for (size_t j{0}; j < search_scheme.size(); ++j) {

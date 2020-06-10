@@ -14,8 +14,8 @@
 
 #include <seqan3/core/algorithm/configuration.hpp>
 #include <seqan3/range/views/persist.hpp>
-#include <seqan3/search/algorithm/detail/search.hpp>
-#include <seqan3/search/algorithm/detail/search_traits.hpp>
+#include <seqan3/search/search.hpp>
+#include <seqan3/search/detail/search_traits.hpp>
 #include <seqan3/search/fm_index/all.hpp>
 #include <seqan3/std/algorithm>
 #include <seqan3/std/ranges>
@@ -257,14 +257,14 @@ void search_ss_ng(index_t const & index, query_t const & query, block_info_t con
         auto const & [blocks_length, start_pos] = block_info[search_id];
 
         search_ss_ng(
-            index.begin(),            // cursor on the index
+            index.cursor(),           // cursor on the index
             query,                    // query to be searched
             start_pos, start_pos + 1, // infix range already searched (open interval)
                                       // the first character of `query` has the index 1 (not 0)
             0,                        // errors spent
             0,                        // current block id in search scheme
             true,                     // search the first block from left to right
-            search, blocks_length,     // search scheme information
+            search, blocks_length,    // search scheme information
             error_left,               // errors left (broken down by error types)
             delegate                  // delegate function called on hit
         );
