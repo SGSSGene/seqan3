@@ -300,6 +300,7 @@ void search_single_ng(index_t const & index, query_t const & query, block_info_t
 template <typename index_t, typename queries_t, typename search_schemes_t, typename delegate_t>
 void search_ng(index_t const & index, queries_t && queries, uint8_t max_error, search_schemes_t const & search_schemes, delegate_t && delegate)
 {
+    if (search_schemes.empty()) return;
     // retrieve cumulative block lengths and starting position
     auto const block_info = detail::search_scheme_block_info(search_schemes, std::ranges::size(queries[0]));
 

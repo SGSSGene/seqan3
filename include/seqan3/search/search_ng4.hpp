@@ -316,6 +316,8 @@ struct Search_ng4 {
 template <typename index_t, typename queries_t, typename search_schemes_t, typename delegate_t>
 void search_ng4(index_t const & index, queries_t && queries, uint8_t _max_error, search_schemes_t const & search_scheme, delegate_t && delegate)
 {
+    if (search_scheme.empty()) return;
+
     auto length = queries[0].size();
     auto internal_delegate = [&delegate, length] (size_t qidx, auto const & it)
     {

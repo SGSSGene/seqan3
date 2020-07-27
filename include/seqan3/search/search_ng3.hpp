@@ -135,6 +135,8 @@ struct Search_ng3 {
 template <typename index_t, typename queries_t, typename search_schemes_t, typename delegate_t>
 void search_ng3(index_t const & index, queries_t && queries, uint8_t _max_error, search_schemes_t const & search_scheme, delegate_t && delegate)
 {
+    if (search_scheme.empty()) return;
+
     auto length = queries[0].size();
     auto internal_delegate = [&delegate, length] (size_t qidx, auto const & it)
     {
@@ -153,9 +155,9 @@ void search_ng3(index_t const & index, queries_t && queries, uint8_t _max_error,
     auto rootCursor = bi_fm_index_cursor_ng2{index};
 
     std::vector<std::tuple<size_t, int>> errors;
-	for (size_t idx{0}; idx < queries.size(); ++idx) {
-		errors.emplace_back(idx, 0);
-	}
+    for (size_t idx{0}; idx < queries.size(); ++idx) {
+        errors.emplace_back(idx, 0);
+    }
 
     for (size_t j{0}; j < search_scheme.size(); ++j) {
         auto const& search = search_scheme[j];

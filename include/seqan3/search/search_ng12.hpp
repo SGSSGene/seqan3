@@ -320,17 +320,18 @@ struct Search_ng12 {
 };
 
 
-template <bool Actions=false, typename index_t, typename queries_t, typename search_schemes_t, typename delegate_t>
-void search_ng12(index_t const & index, queries_t && queries, uint8_t _max_error, search_schemes_t const & search_scheme, delegate_t && delegate)
+template <bool Actions=false, typename index_t, typename queries_t, typename search_schemes_t, typename delegate_t, typename sm_t>
+void search_ng12(index_t const & index, queries_t && queries, uint8_t _max_error, search_schemes_t const & search_scheme, delegate_t && delegate, sm_t const& sm)
 {
-	auto len = queries[0].size();
+    if (search_scheme.empty()) return;
+    auto len = queries[0].size();
     auto internal_delegate = [&delegate, len] (size_t qidx, auto const & it, auto const& actions)
     {
-    	if constexpr (Actions) {
-	    	delegate(qidx, it, actions);
-	    } else {
-	    	delegate(qidx, it);
-	    }
+        if constexpr (Actions) {
+            delegate(qidx, it, actions);
+        } else {
+            delegate(qidx, it);
+        }
 #if 0
         it.locate([&](auto p1, auto p2) {
             delegate(qidx, p1, p2/*, actions*/);

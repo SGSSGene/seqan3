@@ -468,12 +468,12 @@ struct Search_ng2 {
 template <bool fast_lex = false, bool use_scoring_matrix = false, typename index_t, typename queries_t, typename search_schemes_t, typename delegate_t, typename sm_t>
 void search_ng2(index_t const & index, queries_t && queries, uint8_t _max_error, search_schemes_t const & search_scheme, delegate_t && delegate, sm_t const& sm)
 {
-	auto len = queries[0].size();
+    if (search_scheme.empty()) return;
+
+    auto len = queries[0].size();
     auto internal_delegate = [&delegate, len] (size_t qidx, auto const & it)
     {
-        it.locate([&](auto p1, auto p2) {
-            delegate(qidx, p1, p2);
-        });
+        delegate(qidx, it);
     };
     std::vector<std::vector<int>> dirs;
     for (auto const& search : search_scheme) {
@@ -483,7 +483,7 @@ void search_ng2(index_t const & index, queries_t && queries, uint8_t _max_error,
         }
     }
 
-	using query_alphabet_t = range_innermost_value_t<queries_t>;
+    using query_alphabet_t = range_innermost_value_t<queries_t>;
     auto rootCursor = bi_fm_index_cursor_ng2<index_t>{index};
     for (size_t i{0}; i < queries.size(); ++i) {
         auto const& query = queries[i];
