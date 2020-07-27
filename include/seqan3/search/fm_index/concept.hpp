@@ -168,11 +168,11 @@ SEQAN3_CONCEPT fm_index_cursor_specialisation = std::semiregular<t> && requires 
         { cur.extend_right(c)   } -> bool;
         { cur.extend_right(seq) } -> bool;
         { cur.cycle_back()      } -> bool;
-        { cur.path_label(text)  } -> auto;
+//        { cur.path_label(text)  } -> auto;
     };
 
     { cur.last_rank()    } -> typename t::size_type;
-    { cur.query_length() } -> typename t::size_type;
+    //{ cur.query_length() } -> typename t::size_type;
     { cur.count()        } -> typename t::size_type;
     { cur.locate()       } -> std::vector<std::pair<typename t::size_type, typename t::size_type>>;
     { cur.lazy_locate()  } -> auto;
