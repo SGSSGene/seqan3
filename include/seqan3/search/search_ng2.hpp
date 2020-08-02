@@ -301,7 +301,7 @@ public:
 namespace seqan3
 {
 
-template <bool fast_lex, bool use_scoring_matrix, typename cursor_t, typename query_t, typename search_scheme_t, typename delegate_t, typename scoring_matrix_t>
+template <bool fast_lex, bool use_scoring_matrix, int cacheLevel, typename cursor_t, typename query_t, typename search_scheme_t, typename delegate_t, typename scoring_matrix_t>
 struct Search_ng2 {
 	query_t const& query;
 	std::vector<int> const& dir;
@@ -316,9 +316,33 @@ struct Search_ng2 {
 
 	constexpr static size_t index_sigma = alphabet_size<index_alphabet_type>;
 
+	static constexpr size_t fac(size_t f) {
+		if (f > 0) {
+			return 6 * fac(f-1);
+		}
+		return 1;
+	}
+	//inline static std::array<std::optional<cursor_t>, fac(cacheLevel)> cache2;
+	using Cache2 = std::array<std::optional<cursor_t>, fac(cacheLevel)>;
+	inline static std::unique_ptr<Cache2> cache2;
+
+//	inline static std::unordered_map<size_t, cursor_t> cache;
 
 
-	Search_ng2(cursor_t const& _cursor, query_t const& _query, std::vector<int> const& _dir, search_scheme_t const& _search, size_t _qidx, delegate_t const& _delegate, scoring_matrix_t const& _scoring_matrix)
+	auto get_cursor(int id, int pos, query_t const& _query) -> cursor_t {
+		if (not cache2->at(id).has_value()) {
+			auto cursor = get_cursor(id / 6, pos-1, _query);
+			if (cursor.valid()) {
+				auto rank_c = cursor.convert((query[search.pi[pos]]));
+				cache2->at(id) = extend(cursor, pos, rank_c);
+			} else {
+				cache2->at(id) = cursor;
+			}
+		}
+		return cache2->at(id).value();
+	}
+
+	Search_ng2(cursor_t const& _cursor, query_t const& _query, std::vector<int> const& _dir, search_scheme_t const& _search, size_t _qidx, size_t _search_idx, delegate_t const& _delegate, scoring_matrix_t const& _scoring_matrix)
 		: query    {_query}
 		, dir      {_dir}
 		, search   {_search}
@@ -326,7 +350,32 @@ struct Search_ng2 {
 		, delegate {_delegate}
 		, scoring_matrix {_scoring_matrix}
 	{
-		search_next(_cursor, 0, 0);
+		if constexpr (cacheLevel > 0) {
+			auto cursor = cache2->at(0).value();
+			std::size_t id{};
+			for (auto i{0}; i < cacheLevel; ++i) {
+				auto rank_c = cursor.convert((query[search.pi[i]]));
+				id = id * 6 + rank_c;
+			}
+			cursor = get_cursor(id, cacheLevel-1, _query);
+
+			search_next(cursor, 0, cacheLevel);
+
+/*			auto iter = cache.find(id);
+			if (iter == end(cache)) {
+				auto cursor = _cursor;
+				for (int i{0}; i < cacheLevel and cursor.valid(); ++i) {
+					auto rank_c = cursor.convert(query[search.pi[i]]);
+					cursor = extend(cursor, i, rank_c);
+				}
+				cache[id] = cursor;
+				search_next(cursor, 0, cacheLevel);
+			} else {
+				search_next(iter->second, 0, cacheLevel);
+			}*/
+		} else {
+			search_next(_cursor, 0, 0);
+		}
 	}
 
 	auto extend(cursor_t const& cur, int pos, index_rank_type rank) const noexcept {
@@ -364,100 +413,73 @@ struct Search_ng2 {
 		assert(search.pi[pos] >= 0);
 		assert(search.pi[pos] < query.size());
 
-		if constexpr (use_scoring_matrix) {
-			/*std::array<cursor_t, index_sigma+1> cursors;
+		if constexpr (use_scoring_matrix and fast_lex) {
+			auto rank_c = cur.convert(query[search.pi[pos]]);
+
 			extend_cb(cur, pos, [&](auto c, auto newCur) {
-				cursors[c] = newCur;
-			});*/
-			auto query_c = query[search.pi[pos]];
-//			auto query_rank = cur.convert(query_c);
-			auto query_rank = query[search.pi[pos]].to_rank();
+				if (c > index_sigma) return;
+				auto score = scoring_matrix[c-1][rank_c-1];
+				if (search.l[pos] <= e+score and e+score <= search.u[pos]) {
+					search_next(newCur, e+score, pos+1);
+				}
+			});
+
+
+		} else if constexpr (use_scoring_matrix) {
+			auto rank_c = cur.convert(query[search.pi[pos]]);
+
 			for (index_rank_type i{1}; i <= index_sigma; ++i) {
-				auto score = scoring_matrix[i-1][query_rank];
-				//int score = i != query_rank;
+				auto score = scoring_matrix[i-1][rank_c-1];
 				if (search.l[pos] <= e+score and e+score <= search.u[pos]) {
 					auto newCur = extend(cur, pos, i);
-					//auto newCur = cursors[i];
 					search_next(newCur, e+score, pos+1);
 				}
 			}
-		} else {
-		auto rank_c = cur.convert(query[search.pi[pos]]);
+		} else if constexpr (fast_lex) {
+			auto rank_c = cur.convert(query[search.pi[pos]]);
 
-		if (search.l[pos] <= e and e+1 <= search.u[pos]) {
-			std::array<cursor_t, index_sigma+1> cursors;
-			if constexpr (fast_lex) {
+			if (search.l[pos] <= e and e+1 <= search.u[pos]) {
 				extend_cb(cur, pos, [&](auto c, auto newCur) {
 					if (c > index_sigma) return;
-					cursors[c] = newCur;
+					int error = (c != rank_c);
+					search_next(newCur, e+error, pos+1);
 				});
-			} else {
-				for (index_rank_type i{1}; i <= index_sigma; ++i) {
-					cursors[i] = extend(cur, pos, i);
-				}
-			}
 
-			for (index_rank_type i{1}; i <= index_sigma; ++i) {
-				int error = (i != rank_c);
-				search_next(cursors[i], e+error, pos+1);
-			}
-//			auto newCur = extend(cur, pos, c);
-//			search_next(cursors[c-1], e, pos+1);
+			} else if (search.l[pos] <= e and e <= search.u[pos]) {
+				auto newCur = extend(cur, pos, rank_c);
+				search_next(newCur, e, pos+1);
 
-		} else {
-
-		if (search.l[pos] <= e and e <= search.u[pos]) {
-			auto newCur = extend(cur, pos, rank_c);
-			search_next(newCur, e, pos+1);
-		} else if (search.l[pos] <= e+1 and e+1 <= search.u[pos]) {
-			if constexpr (fast_lex) {
-				std::array<cursor_t, index_sigma+1> cursors;
+			} else if (search.l[pos] <= e+1 and e+1 <= search.u[pos]) {
 				extend_cb(cur, pos, [&](auto c, auto newCur) {
 					if (c > index_sigma) return;
-					cursors[c] = newCur;
+					if (c == rank_c) return;
+					search_next(newCur, e+1, pos+1);
 				});
+			}
+		} else {
+			auto rank_c = cur.convert(query[search.pi[pos]]);
 
-				#ifndef NDEBUG
-				std::array<cursor_t, index_sigma+1> oldCursors;
-
+			if (search.l[pos] <= e and e+1 <= search.u[pos]) {
 				for (index_rank_type i{1}; i <= index_sigma; ++i) {
-					//if (i+1 == rank) continue;
-					oldCursors[i] = extend(cur, pos, i);
+					int error = (i != rank_c);
+					auto newCursor = extend(cur, pos, i);
+					search_next(newCursor, e+error, pos+1);
 				}
-
-				for (index_rank_type i{1}; i <= index_sigma; ++i) {
-					//if (i+1 == rank) continue;
-					assert(oldCursors[i].fwd_lb == cursors[i].fwd_lb);
-					assert(oldCursors[i].rev_lb == cursors[i].rev_lb);
-					assert(oldCursors[i].range == cursors[i].range);
-				}
-				#endif
-				for (index_rank_type i{1}; i <= index_sigma; ++i) {
-					if (i == rank_c) continue;
-					search_next(cursors[i], e+1, pos+1);
-				}
-			} else {
+			} else if (search.l[pos] <= e and e <= search.u[pos]) {
+				auto newCur = extend(cur, pos, rank_c);
+				search_next(newCur, e, pos+1);
+			} else if (search.l[pos] <= e+1 and e+1 <= search.u[pos]) {
 				for (index_rank_type i{1}; i <= index_sigma; ++i) {
 					if (i == rank_c) continue;
 					auto newCur = extend(cur, pos, i);
 					search_next(newCur, e+1, pos+1);
 				}
 			}
-
-			/*fmt::print("old Cursor: ({} {} {})\n", cur.fwd_lb, cur.rev_lb, cur.range);
-			for (auto const& cur : cursors) {
-				fmt::print("new Cursor: ({} {} {})\n", cur.fwd_lb, cur.rev_lb, cur.range);
-			}*/
-
-			/*for (auto const& newCur : cursors) {
-				search_next(newCur, e+1, pos+1);
-			}*/
 		}
-		}}
 	}
 };
 
-template <bool fast_lex = false, bool use_scoring_matrix = false, typename index_t, typename queries_t, typename search_schemes_t, typename delegate_t, typename sm_t>
+template <bool fast_lex = false, bool use_scoring_matrix = false, int cache_level = 0, typename index_t, typename queries_t, typename search_schemes_t, typename delegate_t, typename sm_t>
 void search_ng2(index_t const & index, queries_t && queries, uint8_t _max_error, search_schemes_t const & search_scheme, delegate_t && delegate, sm_t const& sm)
 {
     if (search_scheme.empty()) return;
@@ -477,13 +499,21 @@ void search_ng2(index_t const & index, queries_t && queries, uint8_t _max_error,
 
     using query_alphabet_t = range_innermost_value_t<queries_t>;
     auto rootCursor = bi_fm_index_cursor_ng2<index_t>{index};
-    for (size_t i{0}; i < queries.size(); ++i) {
+
+	using S = Search_ng2<fast_lex, use_scoring_matrix, cache_level, std::decay_t<decltype(rootCursor)>, decltype(queries[0]), decltype(search_scheme[0]), decltype(internal_delegate), sm_t>;
+
+    S::cache2 = std::make_unique<typename S::Cache2>();
+
+    for (size_t j{0}; j < search_scheme.size(); ++j) {
+        auto const& search = search_scheme[j];
+        auto const& dir   = dirs[j];
+
+		*S::cache2 = {};
+		S::cache2->at(0) = rootCursor;
+        for (size_t i{0}; i < queries.size(); ++i) {
         auto const& query = queries[i];
         //auto realQuery = rootCursor.convert(query);
-        for (size_t j{0}; j < search_scheme.size(); ++j) {
-            auto const& search = search_scheme[j];
-            auto const& dir   = dirs[j];
-            Search_ng2<fast_lex, use_scoring_matrix, std::decay_t<decltype(rootCursor)>, decltype(query), decltype(search), decltype(internal_delegate), sm_t>{rootCursor, query, dir, search, i, internal_delegate, sm};
+            Search_ng2<fast_lex, use_scoring_matrix, cache_level, std::decay_t<decltype(rootCursor)>, decltype(query), decltype(search), decltype(internal_delegate), sm_t>{rootCursor, query, dir, search, i, j, internal_delegate, sm};
         }
     }
 }
