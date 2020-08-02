@@ -208,7 +208,6 @@ public:
     }
 
     bool valid() const noexcept {
-        assert(index != nullptr);
         return range > 0;
     }
 
