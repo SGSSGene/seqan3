@@ -228,7 +228,6 @@ public:
      */
     size_type count() const noexcept
     {
-        assert(index != nullptr);
         return range;
     }
 
