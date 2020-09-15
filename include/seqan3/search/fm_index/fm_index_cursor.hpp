@@ -100,6 +100,19 @@ private:
     template <typename _index_t>
     friend class bi_fm_index_cursor;
 
+    template <typename _index_t>
+    friend class bi_fm_index_cursor_ng3;
+
+    template <typename _index_t>
+    friend class bi_fm_index_cursor_ng4;
+
+    template <typename _index_t>
+    friend class bi_fm_index_cursor_ng5;
+
+    template <typename _index_t>
+    friend class bi_fm_index_cursor_ng6;
+
+
     //!\brief Helper function to recompute text positions since the indexed text is reversed.
     size_type offset() const noexcept
     {

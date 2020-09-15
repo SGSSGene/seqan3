@@ -5,6 +5,9 @@
 #include <seqan3/search/search.hpp>
 #include <seqan3/search/fm_index/all.hpp>
 
+template <typename>
+class nothing;
+
 int main()
 {
     using seqan3::operator""_dna4;
@@ -15,6 +18,9 @@ int main()
 
     // build an FM index
     seqan3::fm_index index{genomes};
+
+    nothing<decltype(queries)> n1{};
+    nothing<decltype(index)> n2{};
 
     // search for the queries "GCT" and "ACCC"
     for (auto && result : seqan3::search(queries, index))

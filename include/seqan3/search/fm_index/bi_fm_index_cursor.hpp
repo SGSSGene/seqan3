@@ -128,7 +128,7 @@ private:
     //\}
 
     //!\brief Depth of the node in the suffix tree, i.e. length of the searched query.
-    size_type depth; // equal for both cursors. only stored once
+    size_type fwd_depth; // equal for both cursors. only stored once
 
     // supports assertions to check whether cycle_back() resp. cycle_front() is called on the same direction as the last
     // extend_right([...]) resp. extend_left([...])
@@ -141,8 +141,8 @@ private:
     //!\brief Helper function to recompute text positions since the indexed text is reversed.
     size_type offset() const noexcept
     {
-        assert(index->size() > query_length());
-        return index->size() - query_length() - 1; // since the string is reversed during construction
+        assert(index->size() > fwd_depth);
+        return index->size() - fwd_depth - 1; // since the string is reversed during construction
     }
 
     //!\brief Optimized bidirectional search without alphabet mapping
@@ -266,7 +266,7 @@ public:
                                                           fwd_lb(0), fwd_rb(_index.size() - 1),
                                                           rev_lb(0), rev_rb(_index.size() - 1),
                                                           sigma(_index.fwd_fm.index.sigma - index_t::text_layout_mode),
-                                                          depth(0)
+                                                          fwd_depth(0)
     {}
     //\}
 
@@ -286,11 +286,11 @@ public:
     {
         assert(index != nullptr);
         // equal SA interval implies equal parent node information (or both are root nodes)
-        assert(!(fwd_lb == rhs.fwd_lb && fwd_rb == rhs.fwd_rb && depth == rhs.depth) ||
-               (depth == 0) ||
+        assert(!(fwd_lb == rhs.fwd_lb && fwd_rb == rhs.fwd_rb && fwd_depth == rhs.fwd_depth) ||
+               (fwd_depth == 0) ||
                (parent_lb == rhs.parent_lb && parent_rb == rhs.parent_rb && _last_char == rhs._last_char));
 
-        return std::tie(fwd_lb, fwd_rb, depth) == std::tie(rhs.fwd_lb, rhs.fwd_rb, rhs.depth);
+        return std::tie(fwd_lb, fwd_rb, fwd_depth) == std::tie(rhs.fwd_lb, rhs.fwd_rb, rhs.fwd_depth);
     }
 
     /*!\brief Compares two cursors.
@@ -340,20 +340,20 @@ public:
         size_type new_parent_lb = fwd_lb, new_parent_rb = fwd_rb;
 
         sdsl_char_type c = 1; // NOTE: start with 0 or 1 depending on implicit_sentintel
-        while (c < sigma &&
+        while (c <= sigma &&
                !bidirectional_search(index->fwd_fm.index, index->fwd_fm.index.comp2char[c],
                                      fwd_lb, fwd_rb, rev_lb, rev_rb))
         {
             ++c;
         }
 
-        if (c != sigma)
+        if (c <= sigma)
         {
             parent_lb = new_parent_lb;
             parent_rb = new_parent_rb;
 
             _last_char = c;
-            ++depth;
+            ++fwd_depth;
 
             return true;
         }
@@ -388,20 +388,20 @@ public:
         size_type new_parent_lb = rev_lb, new_parent_rb = rev_rb;
 
         sdsl_char_type c = 1; // NOTE: start with 0 or 1 depending on implicit_sentintel
-        while (c < sigma &&
+        while (c <= sigma &&
                !bidirectional_search(index->rev_fm.index, index->rev_fm.index.comp2char[c],
                                      rev_lb, rev_rb, fwd_lb, fwd_rb))
         {
             ++c;
         }
 
-        if (c != sigma)
+        if (c <= sigma)
         {
             parent_lb = new_parent_lb;
             parent_rb = new_parent_rb;
 
             _last_char = c;
-            ++depth;
+            ++fwd_depth;
 
             return true;
         }
@@ -446,7 +446,7 @@ public:
             parent_rb = new_parent_rb;
 
             _last_char = c_char;
-            ++depth;
+            ++fwd_depth;
 
             return true;
         }
@@ -501,7 +501,7 @@ public:
             parent_rb = new_parent_rb;
 
             _last_char = c_char;
-            ++depth;
+            ++fwd_depth;
 
             return true;
         }
@@ -579,7 +579,7 @@ public:
         parent_rb = new_parent_rb;
 
         _last_char = c;
-        depth += len;
+        fwd_depth += len;
 
         return true;
     }
@@ -650,7 +650,7 @@ public:
         parent_lb = new_parent_lb;
         parent_rb = new_parent_rb;
         _last_char = c;
-        depth += len;
+        fwd_depth += len;
 
         return true;
     }
@@ -688,18 +688,18 @@ public:
         assert(fwd_cursor_last_used);
     #endif
 
-        assert(index != nullptr && query_length() > 0);
+        assert(index != nullptr && fwd_depth > 0);
 
         sdsl_char_type c = _last_char + 1;
 
-        while (c < sigma &&
+        while (c <= sigma &&
                !bidirectional_search_cycle(index->fwd_fm.index, index->fwd_fm.index.comp2char[c],
                                            parent_lb, parent_rb, fwd_lb, fwd_rb, rev_lb, rev_rb))
         {
             ++c;
         }
 
-        if (c != sigma)
+        if (c <= sigma)
         {
             _last_char = c;
 
@@ -741,17 +741,17 @@ public:
         assert(!fwd_cursor_last_used);
     #endif
 
-        assert(index != nullptr && query_length() > 0);
+        assert(index != nullptr);
 
         sdsl_char_type c = _last_char + 1;
-        while (c < sigma &&
+        while (c <= sigma &&
                !bidirectional_search_cycle(index->rev_fm.index, index->rev_fm.index.comp2char[c],
                                            parent_lb, parent_rb, rev_lb, rev_rb, fwd_lb, fwd_rb))
         {
             ++c;
         }
 
-        if (c != sigma)
+        if (c <= sigma)
         {
             _last_char = c;
 
@@ -779,35 +779,11 @@ public:
      */
     size_type last_rank() noexcept
     {
-        assert(index != nullptr && query_length() > 0);
+        assert(index != nullptr);
 
         return index->fwd_fm.index.comp2char[_last_char] - 1; // text is not allowed to contain ranks of 0
     }
 
-    /*!\brief Returns the depth of the cursor node in the implicit suffix tree, i.e. the length of the sequence
-     *        searched.
-     * \returns Length of searched sequence.
-     *
-     * ### Complexity
-     *
-     * Constant.
-     *
-     * ### Exceptions
-     *
-     * No-throw guarantee.
-     */
-    size_type query_length() const noexcept
-    {
-        assert(index != nullptr);
-        // depth == 0 -> root node
-        assert(depth != 0 ||
-               (fwd_lb == rev_lb &&
-                fwd_rb == rev_rb &&
-                fwd_lb == 0 &&
-                fwd_rb == index->size() - 1));
-
-        return depth;
-    }
 
     /*!\brief Returns a unidirectional seqan3::fm_index_cursor on the original text. path_label() on the returned
      *        unidirectional index cursor will be equal to path_label() on the bidirectional index cursor.
@@ -835,7 +811,7 @@ public:
         fwd_cursor cur{index->fwd_fm};
         cur.parent_lb = parent_lb;
         cur.parent_rb = parent_rb;
-        cur.node = {fwd_lb, fwd_rb, depth, _last_char};
+        cur.node = {fwd_lb, fwd_rb, fwd_depth, _last_char};
 
     #ifndef NDEBUG
         if (!fwd_cursor_last_used)
@@ -911,6 +887,27 @@ public:
         // Take subtext, slice query out of it
         return text[text_id] | views::slice(query_begin, query_begin + query_length());
     }
+    rev_cursor to_rev_cursor() const noexcept
+    {
+    	assert(false);
+        assert(index != nullptr);
+
+        rev_cursor cur{index->rev_fm};
+        cur.parent_lb = parent_lb;
+        cur.parent_rb = parent_rb;
+        cur.node = {rev_lb, rev_rb, fwd_depth, _last_char};
+
+    #ifndef NDEBUG
+        if (fwd_cursor_last_used)
+        {
+            // invalidate parent interval
+            cur.parent_lb = 1;
+            cur.parent_rb = 0;
+        }
+    #endif
+
+        return cur;
+    }
 
     /*!\brief Counts the number of occurrences of the searched query in the text.
      * \returns Number of occurrences of the searched query in the text.
@@ -969,7 +966,7 @@ public:
         occ.reserve(count());
         for (size_type i = 0; i < count(); ++i)
         {
-            size_type loc = offset() - index->fwd_fm.index[fwd_lb + i];
+            size_type loc = index->size() - fwd_depth - index->fwd_fm.index[fwd_lb + i] - 1;
             size_type sequence_rank = index->fwd_fm.text_begin_rs.rank(loc + 1);
             size_type sequence_position = loc - index->fwd_fm.text_begin_ss.select(sequence_rank);
             occ.emplace_back(sequence_rank - 1, sequence_position);

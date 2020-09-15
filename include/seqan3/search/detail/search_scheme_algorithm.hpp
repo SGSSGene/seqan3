@@ -668,6 +668,58 @@ inline void search_scheme_algorithm<configuration_t, index_t, policies_t...>::se
         case 3:
             search_ss<abort_on_hit>(*index_ptr, query, error_left, optimum_search_scheme<0, 3>, delegate);
             break;
+        case 4:
+            search_ss<abort_on_hit>(*index_ptr, query, error_left, optimum_search_scheme<0, 4>, delegate);
+            break;
+        case 5:
+            search_ss<abort_on_hit>(*index_ptr, query, error_left, optimum_search_scheme<0, 5>, delegate);
+            break;
+        case 6:
+            search_ss<abort_on_hit>(*index_ptr, query, error_left, optimum_search_scheme<0, 6>, delegate);
+            break;
+        case 7:
+            search_ss<abort_on_hit>(*index_ptr, query, error_left, optimum_search_scheme<0, 7>, delegate);
+            break;
+        case 8:
+            search_ss<abort_on_hit>(*index_ptr, query, error_left, optimum_search_scheme<0, 8>, delegate);
+            break;
+        case 9:
+            search_ss<abort_on_hit>(*index_ptr, query, error_left, optimum_search_scheme<0, 9>, delegate);
+            break;
+        case 10:
+            search_ss<abort_on_hit>(*index_ptr, query, error_left, optimum_search_scheme<0, 10>, delegate);
+            break;
+        case 11:
+            search_ss<abort_on_hit>(*index_ptr, query, error_left, optimum_search_scheme<0, 11>, delegate);
+            break;
+        case 12:
+            search_ss<abort_on_hit>(*index_ptr, query, error_left, optimum_search_scheme<0, 12>, delegate);
+            break;
+        case 13:
+            search_ss<abort_on_hit>(*index_ptr, query, error_left, optimum_search_scheme<0, 13>, delegate);
+            break;
+        case 14:
+            search_ss<abort_on_hit>(*index_ptr, query, error_left, optimum_search_scheme<0, 14>, delegate);
+            break;
+        case 15:
+            search_ss<abort_on_hit>(*index_ptr, query, error_left, optimum_search_scheme<0, 15>, delegate);
+            break;
+        case 16:
+            search_ss<abort_on_hit>(*index_ptr, query, error_left, optimum_search_scheme<0, 16>, delegate);
+            break;
+        case 17:
+            search_ss<abort_on_hit>(*index_ptr, query, error_left, optimum_search_scheme<0, 17>, delegate);
+            break;
+        case 18:
+            search_ss<abort_on_hit>(*index_ptr, query, error_left, optimum_search_scheme<0, 18>, delegate);
+            break;
+        case 19:
+            search_ss<abort_on_hit>(*index_ptr, query, error_left, optimum_search_scheme<0, 19>, delegate);
+            break;
+        case 20:
+            search_ss<abort_on_hit>(*index_ptr, query, error_left, optimum_search_scheme<0, 20>, delegate);
+            break;
+
         default:
             auto const & search_scheme{compute_ss(0, error_left.total)};
             search_ss<abort_on_hit>(*index_ptr, query, error_left, search_scheme, delegate);

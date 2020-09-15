@@ -385,8 +385,27 @@ public:
     using cursor_type = fm_index_cursor<fm_index>;
     //!\}
 
+	template <semialphabet, text_layout, detail::sdsl_index>
+    friend class bi_fm_index;
+
     template <typename bi_fm_index_t>
     friend class bi_fm_index_cursor;
+
+    template <typename bi_fm_index_t>
+    friend class bi_fm_index_cursor_ng2;
+
+    template <typename bi_fm_index_t>
+    friend class bi_fm_index_cursor_ng3;
+
+    template <typename bi_fm_index_t>
+    friend class bi_fm_index_cursor_ng4;
+
+    template <typename bi_fm_index_t>
+    friend class bi_fm_index_cursor_ng5;
+
+    template <typename bi_fm_index_t>
+    friend class bi_fm_index_cursor_ng6;
+
 
     template <typename fm_index_t>
     friend class fm_index_cursor;
@@ -445,7 +464,17 @@ public:
     {
         construct(std::forward<text_t>(text));
     }
+
+    void init() {
+    	index.init();
+    }
     //!\}
+
+    template <std::ranges::range text_t>
+    fm_index(text_t && text, bool rev)
+    {
+        construct(std::forward<text_t>(text), rev);
+    }
 
     /*!\brief Returns the length of the indexed text including sentinel characters.
      * \returns Returns the length of the indexed text including sentinel characters.

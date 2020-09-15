@@ -154,6 +154,22 @@ public:
     template <typename bi_fm_index_t>
     friend class bi_fm_index_cursor;
 
+    template <typename bi_fm_index_t>
+    friend class bi_fm_index_cursor_ng2;
+
+    template <typename bi_fm_index_t>
+    friend class bi_fm_index_cursor_ng3;
+
+    template <typename bi_fm_index_t>
+    friend class bi_fm_index_cursor_ng4;
+
+    template <typename bi_fm_index_t>
+    friend class bi_fm_index_cursor_ng5;
+
+    template <typename bi_fm_index_t>
+    friend class bi_fm_index_cursor_ng6;
+
+
     /*!\name Constructors, destructor and assignment
      * \{
      */
@@ -176,6 +192,11 @@ public:
     bi_fm_index(text_t && text)
     {
         construct(std::forward<text_t>(text));
+    }
+
+    void init() {
+        fwd_fm.init();
+        rev_fm.init();
     }
     //!\}
 
@@ -209,6 +230,33 @@ public:
     bool empty() const noexcept
     {
         return size() == 0;
+    }
+
+    /*!\brief converts letter from input alphabet to alphabet of index.
+     * \return rank value of the alphabet represented in alphabet of index
+     *
+     * ### Complexity
+     *
+     * Constant
+     *
+     * ### Exceptions
+     *
+     * No-throw guarantee
+     */
+    template <typename input_alphabet_type>
+    auto convert(input_alphabet_type const input_c) const noexcept -> size_type {
+        static_assert(std::convertible_to<input_alphabet_type, alphabet_t>,
+                     "The character must be convertible to the alphabet of the index.");
+
+        auto index_rank = to_rank(static_cast<alphabet_t>(input_c)) + 1;
+        if constexpr(!std::same_as<alphabet_t, sdsl::plain_byte_alphabet>)
+        {
+            assert(fwd_fm.index.char2comp[index_rank] == rev_fm.index.char2comp[index_rank]);
+            assert(not (index_rank == 0 && fwd_fm.index.char2comp[index_rank] > 0));
+            return fwd_fm.index.char2comp[index_rank];
+        } else {
+            return index_rank;
+        }
     }
 
     /*!\brief Compares two indices.
