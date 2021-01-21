@@ -154,6 +154,11 @@ public:
     template <typename bi_fm_index_t>
     friend class bi_fm_index_cursor;
 
+    //!TODO
+    template <typename bi_fm_index_t>
+    friend class bi_fm_index_cursor_ng;
+
+
     /*!\name Constructors, destructor and assignment
      * \{
      */

@@ -395,6 +395,11 @@ public:
     template <typename fm_index_t>
     friend class detail::fm_index_cursor_node;
 
+    //!TODO
+    template <typename bi_fm_index_t>
+    friend class bi_fm_index_cursor_ng;
+
+
     /*!\name Constructors, destructor and assignment
      * \{
      */
