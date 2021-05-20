@@ -370,7 +370,7 @@ public:
         requires std::forward_iterator<base_base_t>
     //!\endcond
     {
-        return this->base() == rhs.base();
+        return this->as_base() == rhs.as_base();
     }
 
     //!\copydoc operator==()
@@ -380,7 +380,7 @@ public:
         if (pos >= max_pos)
             return true;
 
-        if (this->base() == rhs)
+        if (this->as_base() == rhs)
         {
             if constexpr (or_throw)
                 throw unexpected_end_of_input{"Reached end of input before designated size."};

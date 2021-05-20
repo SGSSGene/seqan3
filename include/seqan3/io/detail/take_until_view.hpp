@@ -283,7 +283,7 @@ public:
                            sentinel_type sen) noexcept(noexcept(base_t{it})) :
         base_t{std::move(it)}, fun{_fun}, stored_end{std::move(sen)}
     {
-        if ((this->base() != stored_end) && fun(**this))
+        if ((this->as_base() != stored_end) && fun(**this))
         {
             at_end_gracefully = true;
             ++(*this);
@@ -314,7 +314,7 @@ public:
     {
         base_t::operator++();
 
-        while ((this->base() != stored_end) && fun(**this))
+        while ((this->as_base() != stored_end) && fun(**this))
         {
             at_end_gracefully = true;
             base_t::operator++();
@@ -346,7 +346,7 @@ public:
         if (at_end_gracefully)
             return true;
 
-        if (this->base() == rhs)
+        if (this->as_base() == rhs)
         {
             if constexpr (or_throw)
                 throw unexpected_end_of_input{"Reached end of input before functor evaluated to true."};
@@ -438,7 +438,7 @@ public:
     friend bool operator==(basic_iterator<rng_t> const & lhs, basic_sentinel const & rhs)
     {
         // Actual comparison delegated to lhs base
-        if (lhs.base() == rhs.urng_sentinel)
+        if (lhs.as_base() == rhs.urng_sentinel)
         {
             if constexpr (or_throw)
                 throw unexpected_end_of_input{"Reached end of input before functor evaluated to true."};

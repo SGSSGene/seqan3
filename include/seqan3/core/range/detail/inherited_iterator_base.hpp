@@ -110,21 +110,6 @@ public:
     {}
     //!\}
 
-    //!\brief Get a copy of the base.
-    constexpr base_t base() const &
-    //!\cond
-        requires std::copyable<base_t>
-    //!\endcond
-    {
-        return as_base();
-    }
-
-    //!\brief Returns an [rvalue](https://en.cppreference.com/w/cpp/language/value_category) of the base.
-    constexpr base_t base() &&
-    {
-        return std::move(as_base());
-    }
-
     /*!\name Comparison operators
      * \brief Unless specialised in derived_type, all operators perform base_t's operator and cast to derived_t.
      * \{
@@ -137,7 +122,7 @@ public:
         requires std::equality_comparable<base_t>
     //!\endcond
     {
-        return base() == rhs.base();
+        return as_base() == rhs.as_base();
     }
 
     //!\brief Checks whether `*this` is not equal to `rhs`.
@@ -157,7 +142,7 @@ public:
         requires std::totally_ordered<base_t>
     //!\endcond
     {
-        return base() < rhs.base();
+        return as_base() < rhs.as_base();
     }
 
     //!\brief Checks whether `*this` is greater than `rhs`.
@@ -167,7 +152,7 @@ public:
         requires std::totally_ordered<base_t>
     //!\endcond
     {
-        return base() > rhs.base();
+        return as_base() > rhs.as_base();
     }
 
     //!\brief Checks whether `*this` is less than or equal to `rhs`.
@@ -409,6 +394,7 @@ private:
     //!\brief Befriend the derived type so it can access the private members.
     friend derived_t;
 
+public:
     //!\brief Cast this to base type.
     constexpr base_t & as_base() & noexcept
     {
@@ -426,7 +412,7 @@ private:
         else
             return *this;
     }
-
+private:
     //!\brief Cast this to derived type.
     constexpr derived_t * this_derived()
     {
