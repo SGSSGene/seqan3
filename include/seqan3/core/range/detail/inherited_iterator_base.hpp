@@ -109,18 +109,21 @@ public:
         : member{std::move(it)}
     {}
     //!\}
+    //
 
-    //!\brief Get a copy of the base.
-    constexpr base_t base() const &
-    //!\cond
-        requires std::copyable<base_t>
-    //!\endcond
+    constexpr base_t const & base() const & noexcept
     {
         return as_base();
     }
 
+    constexpr base_t & base() & noexcept
+    {
+        return as_base();
+    }
+
+
     //!\brief Returns an [rvalue](https://en.cppreference.com/w/cpp/language/value_category) of the base.
-    constexpr base_t base() &&
+    constexpr base_t base() && noexcept
     {
         return std::move(as_base());
     }
