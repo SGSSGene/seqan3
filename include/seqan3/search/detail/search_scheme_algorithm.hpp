@@ -190,6 +190,7 @@ private:
  *
  * Strong exception guarantee.
  */
+inline std::map<std::tuple<size_t, size_t>, std::vector<search_dyn>> precomputed;
 inline std::vector<search_dyn> compute_ss(size_t const min_error, size_t const max_error)
 {
     // TODO: Replace this at least by the pigeonhole principle or even better by 01*0 schemes.
@@ -197,8 +198,13 @@ inline std::vector<search_dyn> compute_ss(size_t const min_error, size_t const m
     //       s.t. easy to compute searches come first. This improves the running time of algorithms that abort after the
     //       first hit (e.g. search strategy: best). Even though it is not guaranteed, this seems to be a good greedy
     //       approach.
-    std::vector<search_dyn> scheme{{{1}, {min_error}, {max_error}}};
-    return scheme;
+//    std::vector<search_dyn> scheme{{{1}, {min_error}, {max_error}}};
+//    return scheme;
+    auto iter = precomputed.find({min_error, max_error});
+    if (precomputed.end() == iter) {
+        throw std::runtime_error("no search scheme exists for this error configuration");
+    }
+    return iter->second;
 }
 
 /*!\brief Returns for each search the cumulative length of blocks in the order of blocks in each search and the
