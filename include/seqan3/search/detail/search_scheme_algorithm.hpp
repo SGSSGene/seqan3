@@ -190,7 +190,7 @@ private:
  *
  * Strong exception guarantee.
  */
-inline std::vector<search_dyn> compute_ss(uint8_t const min_error, uint8_t const max_error)
+inline std::vector<search_dyn> compute_ss(size_t const min_error, size_t const max_error)
 {
     // TODO: Replace this at least by the pigeonhole principle or even better by 01*0 schemes.
     // NOTE: Make sure that the searches are sorted by their asymptotical running time (i.e. upper error bound string),
@@ -236,9 +236,9 @@ inline auto search_scheme_block_info(search_scheme_t const & search_scheme, size
     if constexpr (is_dyn_scheme)
         result.resize(search_scheme.size());
 
-    uint8_t const blocks      {search_scheme[0].blocks()};
+    size_t const blocks      {search_scheme[0].blocks()};
     size_t  const block_length{query_length / blocks};
-    uint8_t const rest        {static_cast<uint8_t>(query_length % blocks)};
+    size_t const rest        {query_length % blocks};
 
     blocks_length_type blocks_length;
     // set all blocks_length values to block_length
@@ -248,10 +248,10 @@ inline auto search_scheme_block_info(search_scheme_t const & search_scheme, size
     else
         blocks_length.fill(block_length);
 
-    for (uint8_t block_id = 0; block_id < rest; ++block_id)
+    for (size_t block_id = 0; block_id < rest; ++block_id)
         ++blocks_length[block_id];
 
-    for (uint8_t search_id = 0; search_id < search_scheme.size(); ++search_id)
+    for (size_t search_id = 0; search_id < search_scheme.size(); ++search_id)
     {
         auto const & search = search_scheme[search_id];
 
@@ -262,7 +262,7 @@ inline auto search_scheme_block_info(search_scheme_t const & search_scheme, size
         if constexpr (is_dyn_scheme)
             search_blocks_length.resize(blocks);
         search_blocks_length[0] = blocks_length[search.pi[0] - 1];
-        for (uint8_t i = 1; i < blocks; ++i)
+        for (size_t i = 1; i < blocks; ++i)
         {
             search_blocks_length[i] = blocks_length[search.pi[i] - 1] + search_blocks_length[i - 1];
             if (search.pi[i] < search.pi[0])
@@ -279,7 +279,7 @@ template <bool abort_on_hit, typename cursor_t, typename query_t, typename searc
           typename delegate_t>
 inline bool search_ss(cursor_t cur, query_t & query,
                       typename cursor_t::size_type const lb, typename cursor_t::size_type const rb,
-                      uint8_t const errors_spent, uint8_t const block_id, bool const go_right, search_t const & search,
+                      size_t const errors_spent, size_t const block_id, bool const go_right, search_t const & search,
                       blocks_length_t const & blocks_length, search_param const error_left, delegate_t && delegate);
 //!\endcond
 
@@ -318,13 +318,13 @@ template <bool abort_on_hit, typename cursor_t, typename query_t, typename searc
           typename delegate_t>
 inline bool search_ss_exact(cursor_t cur, query_t & query,
                             typename cursor_t::size_type const lb, typename cursor_t::size_type const rb,
-                            uint8_t const errors_spent, uint8_t const block_id, bool const go_right,
+                            size_t const errors_spent, size_t const block_id, bool const go_right,
                             search_t const & search, blocks_length_t const & blocks_length,
                             search_param const error_left, delegate_t && delegate)
 {
     using size_type = typename cursor_t::size_type;
 
-    uint8_t const block_id2 = std::min<uint8_t>(block_id + 1, search.blocks() - 1);
+    size_t const block_id2 = std::min<size_t>(block_id + 1, search.blocks() - 1);
     bool const go_right2 = (block_id < search.blocks() - 1) && (search.pi[block_id + 1] > search.pi[block_id]);
 
     if (go_right)
@@ -368,17 +368,17 @@ template <bool abort_on_hit, typename cursor_t, typename query_t, typename searc
           typename delegate_t>
 inline bool search_ss_deletion(cursor_t cur, query_t & query,
                                typename cursor_t::size_type const lb, typename cursor_t::size_type const rb,
-                               uint8_t const errors_spent, uint8_t const block_id, bool const go_right,
+                               size_t const errors_spent, size_t const block_id, bool const go_right,
                                search_t const & search, blocks_length_t const & blocks_length,
                                search_param const error_left, delegate_t && delegate)
 {
-    uint8_t const max_error_left_in_block = search.u[block_id] - errors_spent;
-    uint8_t const min_error_left_in_block = std::max(search.l[block_id] - errors_spent, 0);
+    size_t const max_error_left_in_block = search.u[block_id] - errors_spent;
+    size_t const min_error_left_in_block = std::max(search.l[block_id] - errors_spent, 0ul);
 
     // Switch to the next block when the min number of errors is reached
     if (min_error_left_in_block == 0)
     {
-        uint8_t const block_id2 = std::min<uint8_t>(block_id + 1, search.blocks() - 1);
+        size_t const block_id2 = std::min<size_t>(block_id + 1, search.blocks() - 1);
         bool const go_right2 = block_id2 == 0 ? true : search.pi[block_id2] > search.pi[block_id2 - 1];
 
         if (search_ss<abort_on_hit>(cur, query, lb, rb, errors_spent, block_id2, go_right2, search, blocks_length,
@@ -423,8 +423,8 @@ template <bool abort_on_hit, typename cursor_t, typename query_t, typename searc
           typename delegate_t>
 inline bool search_ss_children(cursor_t cur, query_t & query,
                                typename cursor_t::size_type const lb, typename cursor_t::size_type const rb,
-                               uint8_t const errors_spent, uint8_t const block_id, bool const go_right,
-                               uint8_t const min_error_left_in_block, search_t const & search,
+                               size_t const errors_spent, size_t const block_id, bool const go_right,
+                               size_t const min_error_left_in_block, search_t const & search,
                                blocks_length_t const & blocks_length, search_param const error_left,
                                delegate_t && delegate)
 {
@@ -469,7 +469,7 @@ inline bool search_ss_children(cursor_t cur, query_t & query,
                     }
                     else
                     {
-                        uint8_t const block_id2 = std::min<uint8_t>(block_id + 1, search.blocks() - 1);
+                        size_t const block_id2 = std::min<size_t>(block_id + 1, search.blocks() - 1);
                         bool const go_right2 = block_id2 == 0 ? true : search.pi[block_id2] > search.pi[block_id2 - 1];
 
                         if (search_ss<abort_on_hit>(cur, query, lb2, rb2, errors_spent + delta, block_id2, go_right2,
@@ -518,11 +518,11 @@ template <bool abort_on_hit, typename cursor_t, typename query_t, typename searc
           typename blocks_length_t, typename delegate_t>
 inline bool search_ss(cursor_t cur, query_t & query,
                       typename cursor_t::size_type const lb, typename cursor_t::size_type const rb,
-                      uint8_t const errors_spent, uint8_t const block_id, bool const go_right, search_t const & search,
+                      size_t const errors_spent, size_t const block_id, bool const go_right, search_t const & search,
                       blocks_length_t const & blocks_length, search_param const error_left, delegate_t && delegate)
 {
-    uint8_t const max_error_left_in_block = search.u[block_id] - errors_spent;
-    uint8_t const min_error_left_in_block = std::max(search.l[block_id] - errors_spent, 0); // NOTE: changed
+    size_t const max_error_left_in_block = search.u[block_id] - errors_spent;
+    size_t const min_error_left_in_block = std::max(search.l[block_id] - errors_spent, 0ul); // NOTE: changed
 
     // Done.
     if (min_error_left_in_block == 0 && lb == 0 && rb == std::ranges::size(query) + 1)
@@ -618,7 +618,7 @@ inline void search_ss(index_t const & index, query_t & query, search_param const
     // retrieve cumulative block lengths and starting position
     auto const block_info = search_scheme_block_info(search_scheme, std::ranges::size(query));
 
-    for (uint8_t search_id = 0; search_id < search_scheme.size(); ++search_id)
+    for (size_t search_id = 0; search_id < search_scheme.size(); ++search_id)
     {
         auto const & search = search_scheme[search_id];
         auto const & [blocks_length, start_pos] = block_info[search_id];

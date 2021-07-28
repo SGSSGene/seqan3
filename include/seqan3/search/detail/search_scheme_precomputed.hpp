@@ -23,21 +23,21 @@ namespace seqan3::detail
 //!\brief Object storing information for a search (of a search scheme).
 //!\attention Number of blocks have to be known at compile time.
 //!\ingroup search
-template <uint8_t nbr_blocks>
+template <size_t nbr_blocks>
 struct search
 {
     //!\brief Type for storing the length of blocks
     typedef std::array<size_t, nbr_blocks> blocks_length_type;
 
     //!\brief Order of blocks
-    std::array<uint8_t, nbr_blocks> pi;
+    std::array<uint64_t, nbr_blocks> pi;
     //!\brief Lower error bound for each block (accumulated values)
-    std::array<uint8_t, nbr_blocks> l;
+    std::array<uint64_t, nbr_blocks> l;
     //!\brief Upper error bound for each block (accumulated values)
-    std::array<uint8_t, nbr_blocks> u;
+    std::array<uint64_t, nbr_blocks> u;
 
     //!\brief Returns the number of blocks
-    constexpr uint8_t blocks() const noexcept
+    constexpr size_t blocks() const noexcept
     {
         return nbr_blocks;
     }
@@ -52,14 +52,14 @@ struct search_dyn
     typedef std::vector<size_t> blocks_length_type;
 
     //!\brief Order of blocks
-    std::vector<uint8_t> pi;
+    std::vector<uint64_t> pi;
     //!\brief Lower error bound for each block (accumulated values)
-    std::vector<uint8_t> l;
+    std::vector<uint64_t> l;
     //!\brief Upper error bound for each block (accumulated values)
-    std::vector<uint8_t> u;
+    std::vector<uint64_t> u;
 
     //!\brief Returns the number of blocks
-    uint8_t blocks() const noexcept
+    size_t blocks() const noexcept
     {
         return pi.size();
     }
@@ -67,7 +67,7 @@ struct search_dyn
 
 //!\brief Type for storing search schemes. Number of blocks have to be known at compile time.
 //!\ingroup search
-template <uint8_t nbr_searches, uint8_t nbr_blocks>
+template <size_t nbr_searches, size_t nbr_blocks>
 using search_scheme_type = std::array<search<nbr_blocks>, nbr_searches>;
 
 //!\brief Type for storing search schemes. Number of blocks do not have to be known at compile time.
@@ -83,7 +83,7 @@ using search_scheme_dyn_type = std::vector<search_dyn>;
  *          algorithms that abort after the first hit (e.g. search mode: best). Even though it is not guaranteed, this
  *          seems to be a good greedy approach.
  */
-template <uint8_t min_error, uint8_t max_error>
+template <size_t min_error, size_t max_error>
 inline int constexpr optimum_search_scheme;
 
 //!\cond
